@@ -6,7 +6,7 @@ Several rules in BCX (Bondage Club Extended) 1.1.22 hook functions that are no l
 
 - Main file: `bcx-supplement.user.js`
 - Compatibility: BC R128 and above (after the friend-list rework); every hook target verified on R133
-- Current version: **v1.2.1** (see [CHANGELOG.md](CHANGELOG.md))
+- Current version: **v1.2.2** (see [CHANGELOG.md](CHANGELOG.md))
 
 ## Install (one click)
 
@@ -48,7 +48,7 @@ Alternate sources (identical content; pick one, but if you install from one, cha
 | Forbid disowning submissives | `rc_sub_leave` | `ChatRoomIsOwnedByPlayer` has 0 call sites | Hooks `ServerSend`, intercepting `Release` of `AccountOwnership` |
 | Forbid club owner changes | `rc_club_owner` | `ChatRoomOwnershipOptionIs` has 0 call sites (the admin-screen hook still works) | Hooks `ServerSend`, intercepting `Accept` (when unowned) and `Break` away from the owner |
 | Limit bound admin power | `alt_room_admin_limit` | `ChatRoomAdminAction` has 0 call sites | Hooks `ServerSend`, blocking every `ChatRoomAdmin` action except `Kick` / `Ban` while restrained |
-| **Forbid sending emote messages while Head is occupied** (added here; BCX has no such rule) | `forbid_emote_in_mask` | — | Hooks `ChatRoomSendEmote` — `*text`, `/me`, `/action`, `/attempt` and Mu-style `:text` all converge here; when blocked, an announcement is sent to the room |
+| **Forbid sending emote messages while Head is occupied** (added here; BCX has no such rule) | `forbid_emote_in_mask` | — | Hooks `ChatRoomSendEmote` — `*text`, `/me`, `/action`, `/attempt` and Mu-style `:text` all converge here; when blocked, an announcement is sent to the room; plus an optional `ServerSend` protocol-level backstop |
 
 Not included: the "room is blocked" tooltip of `block_entering_rooms`. The **blocking itself still works** (it goes through `ChatSearchJoin`); only that tooltip in the search results is broken, which is purely cosmetic.
 
@@ -68,10 +68,11 @@ Not included: the "room is blocked" tooltip of `block_entering_rooms`. The **blo
 [BCX-Supplement] ✓ hooked SpeechTransformProcess  (speech_partial_hearing + alt_hearing_whitelist)
 [BCX-Supplement] ✓ hooked ServerSend  (rc_* / alt_room_admin_limit)
 [BCX-Supplement] ✓ hooked ChatRoomSendEmote  (forbid_emote_in_mask（新增）)
-[BCX-Supplement] 已加载 v1.2.1：5/5 个 hook 生效
+[BCX-Supplement] ✓ hooked ServerSend  (forbid_emote_in_mask · 协议层兜底（可选）)
+[BCX-Supplement] 已加载 v1.2.2：6/6 个 hook 生效
 ```
 
-(The last line reads "loaded v1.2.1: 5/5 hooks active".)
+(The last line reads "loaded v1.2.2: 6/6 hooks active".)
 
 The `@match` entries are already in the header, covering `www.bondageprojects.elementfx.com` / `bondageprojects.elementfx.com` / `bondage-club.com`. If you use another mirror, add its domain to `@match`.
 
@@ -109,6 +110,8 @@ Configuration lives in `localStorage["bcx-supplement.config.v1"]`. Two ways to c
 /bcxfix allowhearing 12345    add/remove 12345 to/from the speech whitelist
 /bcxfix word hello            add/remove a word that is always understood
 /bcxfix notice <text>         change the "emote blocked" announcement ({name} or $name is replaced by the nickname)
+/bcxfix emote                 self-check for the emote rule (start here when it "doesn't work")
+/bcxfix group ItemHood        also treat a group as the Head slot (default is ItemHead only)
 /bcxfix reset                 restore defaults
 ```
 
@@ -140,6 +143,8 @@ BCXSupplement.status();    // check whether every hook is in place
 | `forbidBreakLover` | `true` | Forbid breaking up with a lover |
 | `limitAdminWhileRestrained` | `true` | While restrained, disable room admin actions other than kick/ban |
 | `forbidEmoteWhileHeadOccupied` | `true` | Forbid emote messages (`*`-prefixed Emote messages) while the Head slot (`ItemHead`) is occupied, and announce it to the room |
+| `emoteBlockGroups` | `["ItemHead"]` | Which equip groups count as the "Head slot". Default is the wardrobe Head slot only; add `ItemHood` etc. via `/bcxfix group` if your hood lives elsewhere |
+| `emoteBlockAtProtocol` | `false` | Protocol-level backstop: some chat-enhancement mods bypass `ChatRoomSendEmote` and send messages directly; turn this on to also block in `ServerSend` |
 | `emoteNoticeMessage` | `"$name" tries to send an emotion, but failed due to he/she's in a mask` | Announcement template |
 | `emoteNoticeCooldownMs` | `1500` | Announcement cooldown to prevent spam (blocking itself is not affected) |
 | `emoteKeepInputText` | `true` | Keep the original text in the input box after blocking, so you don't retype it |
@@ -226,6 +231,7 @@ The supplement uses **global switches** and has none of BCX's "who it applies to
 | Facial expression | In the same state change the face expression (via the expression panel) | **Unaffected**, works normally (this rule doesn't touch facial expression icons) |
 | Remove the head item | Take the Head slot item off and send `*waves` | Sent normally |
 | Status check | `/bcxfix` | Shows the 10 switches + whitelists + the current Head item + whether all hooks are active |
+| Emote rule self-check | `/bcxfix emote` | Shows the switch, monitored groups, hook state, the item in each group, the current verdict, and how many times it blocked |
 
 If `/bcxfix` reports inactive hooks, send me the `[BCX-Supplement]` console logs — it most likely means BC changed again.
 
@@ -263,3 +269,27 @@ git push
 - When adding a version entry, `CHANGELOG.md` keeps a single copy (Chinese primary); mention documentation-only changes there too.
 
 `docs/BCX-rule-breakage-report.md` is the original investigation report, kept as the rationale for "why it is written this way"; it is not loaded at runtime.
+
+---
+
+## 8. Troubleshooting a rule that "doesn't work" (using the emote rule as the example)
+
+Since v1.2.2 there is a built-in self-check. Go through it in this order:
+
+1. **Confirm the script version**: the Tampermonkey dashboard must show `1.2.2`. Version 1.1.x blocked the facial-expression icon rather than `*text`; 1.2.0/1.2.1 had the two bugs listed below. Click "Check for userscript updates" once, or reinstall from the install page.
+2. **Confirm all 6 hooks are green**: search the console for `[BCX-Supplement]`; the last line should read `已加载 v1.2.2：6/6 个 hook 生效`.
+3. **Type `/bcxfix emote` in chat** and check each line:
+   - `开关 …：关` → run `/bcxfix on forbidEmoteWhileHeadOccupied`
+   - `ChatRoomSendEmote hook：未挂载` → BC changed again; send me the console log
+   - `ItemHead：InventoryGet=空，扫描=空` → whatever you are wearing is not in the Head slot; add it with `/bcxfix group ItemHood` and friends
+   - `当前判定：不会拦截` → one of the lines above is not satisfied
+4. **Wear the head item, send `*waves`, then look at `已拦截 N 次` in `/bcxfix emote` again**:
+   - N becomes 1 → the rule works. If the message still went out, something else is sending it for you (macro, newline send, another mod)
+   - N stays 0 → the message never goes through `ChatRoomSendEmote` (typical of chat-box replacement mods such as WCE) → run `/bcxfix on emoteBlockAtProtocol` and try again
+
+The two bugs fixed in v1.2.2 both looked like "nothing happens and the console reports no error":
+
+| Problem | Cause | Fix |
+|---|---|---|
+| Cross-family items were not detected | `InventoryGet` additionally requires `Group.Family === Player.AssetFamily` (`Inventory.js:681`), so neutral/cross-family headwear was treated as "nothing equipped" | The check now tries the official API first and then falls back to scanning `Player.Appearance` directly, without comparing families |
+| The script crashed when the SDK was already present | `waitForSdk()` used to be called early in the file; when `bcModSdk` already existed `boot()` ran synchronously while `let` state further down was still in its TDZ, so the first hook invocation threw `ReferenceError` and the whole script failed to load | `waitForSdk()` moved to the end of the file, so all state is initialized before booting |

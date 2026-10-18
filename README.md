@@ -6,7 +6,7 @@ BCX（Bondage Club Extended）1.1.22 里有几条规则挂的 hook 在 BC R133 �
 
 - 主文件：`bcx-supplement.user.js`
 - 适用：BC R128 及以上（好友列表改版之后），在 R133 上核对过全部 hook 目标
-- 当前版本：**v1.2.1**（变更记录见 [CHANGELOG.md](CHANGELOG.md)）
+- 当前版本：**v1.2.2**（变更记录见 [CHANGELOG.md](CHANGELOG.md)）
 
 ## 安装（一键）
 
@@ -48,7 +48,7 @@ BCX（Bondage Club Extended）1.1.22 里有几条规则挂的 hook 在 BC R133 �
 | Forbid disowning submissives | `rc_sub_leave` | `ChatRoomIsOwnedByPlayer` 0 调用点 | hook `ServerSend`，拦 `AccountOwnership` 的 `Release` |
 | Forbid club owner changes | `rc_club_owner` | `ChatRoomOwnershipOptionIs` 0 调用点（管理界面的 hook 仍有效） | hook `ServerSend`，拦 `Accept`（无主时）与离开主人的 `Break` |
 | Limit bound admin power | `alt_room_admin_limit` | `ChatRoomAdminAction` 0 调用点 | hook `ServerSend`，束缚时拦掉除 `Kick` / `Ban` 之外的 `ChatRoomAdmin` 动作 |
-| **头部有物品时禁止发送表情消息**（本包新增，BCX 没有这条） | `forbid_emote_in_mask` | — | hook `ChatRoomSendEmote`——`*文字`、`/me`、`/action`、`/attempt`、Mu 风格 `:文字` 全部收敛到这，拦下后向房间发一条公告 |
+| **头部有物品时禁止发送表情消息**（本包新增，BCX 没有这条） | `forbid_emote_in_mask` | — | hook `ChatRoomSendEmote`——`*文字`、`/me`、`/action`、`/attempt`、Mu 风格 `:文字` 全部收敛到这，拦下后向房间发一条公告；另有可选的 `ServerSend` 协议层兜底 |
 
 未包含：`block_entering_rooms` 的「房间已被屏蔽」提示。该规则的**拦截本身仍然有效**（走 `ChatSearchJoin`），失效的只是搜索结果里的那条 tooltip，属于纯装饰。
 
@@ -107,6 +107,8 @@ FUSAM 支持用 URL 参数加载本地脚本（见官方文档「Developing an A
 /bcxfix allowhearing 12345    把 12345 加进/移出「语音白名单」
 /bcxfix word hello            加/删「永远听得懂」的词
 /bcxfix notice <文本>         改「表情消息被拦截」的公告文本（{name} 或 $name 会被替换成昵称）
+/bcxfix emote                 表情消息规则自检（排查「不生效」先看这个）
+/bcxfix group ItemHood        把某个装备分组也算作「头部栏」（默认只有 ItemHead）
 /bcxfix reset                 恢复默认
 ```
 
@@ -138,6 +140,8 @@ BCXSupplement.status();    // 看 hook 是否都挂上了
 | `forbidBreakLover` | `true` | 禁止与恋人分手 |
 | `limitAdminWhileRestrained` | `true` | 被束缚时禁掉除踢人/封禁外的房间管理动作 |
 | `forbidEmoteWhileHeadOccupied` | `true` | 头部栏（`ItemHead`）有物品时禁止发送表情消息（`*` 开头的 Emote 消息），并向房间公告 |
+| `emoteBlockGroups` | `["ItemHead"]` | 哪些装备分组算「头部栏」。默认只有衣柜的 Head 栏；头套在 `ItemHood` 等分组时用 `/bcxfix group` 加进来 |
+| `emoteBlockAtProtocol` | `false` | 协议层兜底：有的聊天增强 mod 绕过 `ChatRoomSendEmote` 直接发消息，打开后在 `ServerSend` 再堵一道 |
 | `emoteNoticeMessage` | `"$name" tries to send an emotion, but failed due to he/she's in a mask` | 公告文本模板 |
 | `emoteNoticeCooldownMs` | `1500` | 公告冷却，防止连发刷屏（拦截本身不受冷却影响） |
 | `emoteKeepInputText` | `true` | 被拦下后把原文留在输入框，省得重打 |
@@ -224,6 +228,7 @@ ServerSend("ChatRoomChat", { Type: "Emote", ... })
 | 表情图标 | 同一状态下改脸上的表情（表情面板点选） | **不受影响**，正常生效（本规则不管表情图标） |
 | 摘掉头饰 | 摘下 Head 栏物品再发 `*waves` | 正常发出 |
 | 状态自查 | `/bcxfix` | 显示 10 个开关 + 白名单 + 「头部栏」当前物品 + hook 是否全部生效 |
+| 表情规则自检 | `/bcxfix emote` | 显示开关、监控分组、hook 状态、每个分组里的物品、当前判定、已拦截次数 |
 
 如果 `/bcxfix` 里显示「未生效 hook」，把控制台的 `[BCX-Supplement]` 日志发我，多半是 BC 又改版了。
 
@@ -261,3 +266,27 @@ git push
 - `CHANGELOG.md` 只保留一份（中文为主），纯文档改动也记一行。
 
 `docs/BCX-rule-breakage-report.md` 是当初的排查报告，保留作为「为什么这么写」的依据，不参与运行。
+
+---
+
+## 八、规则不生效怎么查（以「头部有物品禁用表情消息」为例）
+
+v1.2.2 起内置了自检命令，按这个顺序看：
+
+1. **确认脚本版本**：篡改猴面板里必须是 `1.2.2`。1.1.x 拦的是脸上的表情图标，不是 `*文字`；1.2.0/1.2.1 有下面表里的两个坑。手动点一次「检查用户脚本更新」，或重开安装页装一次。
+2. **确认 6 个 hook 全绿**：控制台搜 `[BCX-Supplement]`，最后一行应为 `已加载 v1.2.2：6/6 个 hook 生效`。
+3. **聊天框敲 `/bcxfix emote`**，逐项对照：
+   - `开关 …：关` → `/bcxfix on forbidEmoteWhileHeadOccupied`
+   - `ChatRoomSendEmote hook：未挂载` → BC 又改版了，把控制台日志发出来
+   - `ItemHead：InventoryGet=空，扫描=空` → 戴的东西不在 Head 栏，用 `/bcxfix group ItemHood` 之类加进来
+   - `当前判定：不会拦截` → 就是上面某一条没满足
+4. **戴着头饰发一条 `*waves`，再看 `/bcxfix emote` 的「已拦截 N 次」**：
+   - N 变成 1 → 规则在工作。若还是看到消息发出去了，说明有别的东西在替你发（宏、换行发送、别的 mod）
+   - N 还是 0 → 消息根本没走 `ChatRoomSendEmote`（常见于 WCE 这类接管聊天框的 mod）→ `/bcxfix on emoteBlockAtProtocol` 再试
+
+v1.2.2 修掉的两个问题，表现都是「完全没反应、控制台也不报错」：
+
+| 问题 | 原因 | 修法 |
+|---|---|---|
+| 跨家族物品判不出来 | `InventoryGet` 内部还要求 `Group.Family === Player.AssetFamily`（`Inventory.js:681`），中立/跨家族头饰会被判成「没戴」 | 改成「先官方 API，取不到再直接扫 `Player.Appearance`」，不再比对家族 |
+| SDK 已存在时脚本自己崩掉 | `waitForSdk()` 原先在文件靠前处调用，`bcModSdk` 已存在时会同步执行 `boot()`，此时后面 `let` 声明的状态还在 TDZ，hook 一触发就 `ReferenceError`，整个脚本不加载 | `waitForSdk()` 移到文件末尾，状态全部初始化后再启动 |

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC · BCX 失效规则补充包 (R133)
 // @namespace    bcx-supplement.local
-// @version      1.2.1
+// @version      1.2.2
 // @description  补回 BCX (Bondage Club Extended) 在 BC R133 上已失效的规则：失明时隐藏在线好友、部分听力/听力白名单、关系控制、束缚时限制管理员权限；另附自定义规则「头部栏有物品时禁止发送表情消息」
 // @author       mrc0580
 // @match        https://www.bondageprojects.elementfx.com/*
@@ -38,7 +38,7 @@
 
 	const TAG = "[BCX-Supplement]";
 	const CFG_KEY = "bcx-supplement.config.v1";
-	const MOD_VERSION = "1.2.1";
+	const MOD_VERSION = "1.2.2";
 
 	/** 默认配置：全部开启，白名单为空 */
 	const DEFAULTS = {
@@ -67,11 +67,17 @@
 		// 5) 自定义新增规则：头部栏（ItemHead）有物品时禁止发送「表情消息」
 		//    注意是表情消息（聊天里 * 开头的 Emote 消息），不是脸上的表情图标
 		forbidEmoteWhileHeadOccupied: true,
+		// 哪些装备分组算「头部栏」。默认只有 ItemHead（衣柜里的 Head 栏）；
+		// 如果你的头套在别的分组（例如 ItemHood），可以用 /bcxfix group 加进来
+		emoteBlockGroups: ["ItemHead"],
 		// {name} / $name 会被替换成昵称（没有昵称就用账号名）
 		emoteNoticeMessage: '"$name" tries to send an emotion, but failed due to he/she\'s in a mask',
 		emoteNoticeCooldownMs: 1500,
 		// 被拦下时把原文留在输入框里，省得玩家重打一遍
 		emoteKeepInputText: true,
+		// 协议层兜底：有些聊天增强 mod（WCE 等）会绕过 ChatRoomSendEmote 直接发消息，
+		// 打开这个开关后在 ServerSend 再堵一道（默认关，避免误伤游戏自带旁白）
+		emoteBlockAtProtocol: false,
 	};
 
 	// ---------------------------------------------------------------------
@@ -246,6 +252,7 @@
 		installSpeechFixes();
 		installProtocolFixes();
 		installEmoteFix();
+		installEmoteProtocolBackstop();
 		registerCommand();
 
 		window.BCXSupplement = {
@@ -279,7 +286,10 @@
 		}
 		bootTimer = setTimeout(waitForSdk, 500);
 	}
-	waitForSdk();
+	// 注意：waitForSdk() 的调用放在文件末尾（见最后一行）。
+	// boot() 在 bcModSdk 已经存在时会「同步」执行，如果这里立刻调用，
+	// 后面用 let 声明的状态（lastEmoteNotice 等）还处于 TDZ，hook 一旦被
+	// 触发就会抛 ReferenceError 把整个脚本带崩。放到末尾可彻底避免。
 
 	// ---------------------------------------------------------------------
 	// 修复 1：Hide online friends if blind
@@ -579,25 +589,55 @@
 	// ---------------------------------------------------------------------
 
 	let lastEmoteNotice = 0;
+	let emoteBlockCount = 0;
+	let lastEmoteBlock = null;
+	let announcingEmote = false; // 防止协议层兜底把「拦截公告」自己也拦掉
 
-	/** 头部栏（ItemHead）当前装备的物品，没有就返回 null */
-	function headItem() {
+	/** 监控的装备分组（默认只有 ItemHead，即衣柜的 Head 栏） */
+	function emoteBlockGroups() {
+		const list = Array.isArray(config.emoteBlockGroups)
+			? config.emoteBlockGroups.filter((g) => typeof g === "string" && g.trim())
+			: [];
+		return list.length ? list : DEFAULTS.emoteBlockGroups.slice();
+	}
+
+	/**
+	 * 在指定分组里找已装备的物品，命中返回 { group, item }，否则 null。
+	 *
+	 * 先走官方 InventoryGet，但它内部还要求 A.Asset.Group.Family === Player.AssetFamily
+	 * （见 R133 Scripts/Inventory.js:681），跨家族/中立家族的物品会被判成 null；
+	 * 所以再补一遍不比对家族的 Appearance 扫描，两条路任一命中都算「有物品」。
+	 */
+	function equippedInGroups(groupNames) {
 		const P = player();
 		if (!P || !Array.isArray(P.Appearance)) return null;
-		try {
-			if (typeof window.InventoryGet === "function") return window.InventoryGet(P, "ItemHead") || null;
-		} catch (err) {
-			/* 退回手动查找 */
+		const names = new Set(groupNames);
+
+		for (const name of names) {
+			try {
+				if (typeof window.InventoryGet === "function") {
+					const item = window.InventoryGet(P, name);
+					if (item) return { group: name, item };
+				}
+			} catch (err) {
+				/* 落到下面的手动扫描 */
+			}
 		}
-		return (
-			P.Appearance.find(
-				(item) => item && item.Asset && item.Asset.Group && item.Asset.Group.Name === "ItemHead"
-			) || null
+
+		const item = P.Appearance.find(
+			(it) => it && it.Asset && it.Asset.Group && names.has(it.Asset.Group.Name)
 		);
+		return item ? { group: item.Asset.Group.Name, item } : null;
+	}
+
+	/** 头部栏（按当前监控分组）已装备的物品，没有就返回 null */
+	function headItem() {
+		const hit = equippedInGroups(emoteBlockGroups());
+		return hit ? hit.item : null;
 	}
 
 	function emoteForbidden() {
-		return !!(config.forbidEmoteWhileHeadOccupied && headItem());
+		return !!(config.forbidEmoteWhileHeadOccupied && equippedInGroups(emoteBlockGroups()));
 	}
 
 	function displayName() {
@@ -663,7 +703,12 @@
 					? window.ServerPlayerIsInChatRoom()
 					: !!window.ChatRoomData;
 			if (inRoom && typeof window.ServerSend === "function") {
-				window.ServerSend("ChatRoomChat", { Type: "Emote", Content: `*${text}`, Dictionary: [] });
+				announcingEmote = true;
+				try {
+					window.ServerSend("ChatRoomChat", { Type: "Emote", Content: `*${text}`, Dictionary: [] });
+				} finally {
+					announcingEmote = false;
+				}
 			}
 		} catch (err) {
 			logErr("发送表情消息拦截公告", err);
@@ -676,7 +721,20 @@
 			20,
 			(args, next) => {
 				try {
-					if (emoteForbidden()) {
+					const hit = config.forbidEmoteWhileHeadOccupied
+						? equippedInGroups(emoteBlockGroups())
+						: null;
+					if (hit) {
+						emoteBlockCount++;
+						lastEmoteBlock = {
+							at: new Date().toLocaleTimeString(),
+							group: hit.group,
+							asset: (hit.item && hit.item.Asset && hit.item.Asset.Name) || hit.group,
+							text: String((args && args[0]) || ""),
+						};
+						console.log(
+							`${TAG} 已拦截表情消息（${hit.group}：${lastEmoteBlock.asset}）→ ${lastEmoteBlock.text}`
+						);
 						restoreChatInputLater();
 						announceEmoteBlocked();
 						return undefined; // 不进 next：消息不会发出去
@@ -687,6 +745,54 @@
 				return next(args);
 			},
 			"forbid_emote_in_mask（新增）"
+		);
+	}
+
+	/**
+	 * 可选兜底：在协议层再堵一道。
+	 * 为什么需要：有些聊天增强 mod 会自己构造消息直接 ServerSend，根本不过
+	 * ChatRoomSendEmote，那样上面的 hook 永远不会被调用（自检里「已拦截 0 次」）。
+	 * 默认关闭，因为协议层分不清「玩家发表情」和「游戏自带旁白」：
+	 *   - WheelFortune 的转盘结果旁白（WheelFortune.js:904/944/957）靠调用栈排除；
+	 *   - 我们自己的拦截公告靠 announcingEmote 标记排除。
+	 */
+	function installEmoteProtocolBackstop() {
+		hook(
+			"ServerSend",
+			40,
+			(args, next) => {
+				try {
+					if (config.emoteBlockAtProtocol && config.forbidEmoteWhileHeadOccupied && !announcingEmote) {
+						const event = args && args[0];
+						const data = args && args[1];
+						if (event === "ChatRoomChat" && data && data.Type === "Emote") {
+							const hit = equippedInGroups(emoteBlockGroups());
+							let fromWheel = false;
+							try {
+								fromWheel = /WheelFortune/i.test(String(new Error().stack || ""));
+							} catch (err) {
+								/* 拿不到栈就按「不是转盘」处理 */
+							}
+							if (hit && !fromWheel) {
+								emoteBlockCount++;
+								lastEmoteBlock = {
+									at: new Date().toLocaleTimeString(),
+									group: hit.group,
+									asset: (hit.item && hit.item.Asset && hit.item.Asset.Name) || hit.group,
+									text: String(data.Content || ""),
+								};
+								console.log(`${TAG} 已拦截表情消息（协议层 · ${hit.group}）→ ${lastEmoteBlock.text}`);
+								announceEmoteBlocked();
+								return undefined;
+							}
+						}
+					}
+				} catch (err) {
+					logErr("表情消息协议层兜底", err);
+				}
+				return next(args);
+			},
+			"forbid_emote_in_mask · 协议层兜底（可选）"
 		);
 	}
 
@@ -705,6 +811,7 @@
 		["forbidBreakLover", "禁止与恋人分手"],
 		["limitAdminWhileRestrained", "束缚时限制管理"],
 		["forbidEmoteWhileHeadOccupied", "头部有物品时禁止发送表情消息"],
+		["emoteBlockAtProtocol", "表情消息协议层兜底（可选）"],
 	];
 
 	function statusLines() {
@@ -720,6 +827,60 @@
 		lines.push(`头部栏：${head ? headName || "有物品" : "空"}${emoteForbidden() ? "（表情消息已禁止）" : ""}`);
 		const failed = hooks.filter((h) => !h.ok);
 		lines.push(failed.length ? `未生效 hook：${failed.map((h) => h.target).join(",")}` : "所有 hook 均已生效");
+		return lines;
+	}
+
+	/** 「表情消息」规则的详细自检：规则看起来没反应时，聊天框敲 /bcxfix emote */
+	function emoteDiagnostics() {
+		const lines = [`BCX 补充包 v${MOD_VERSION} · 表情消息规则自检`];
+
+		lines.push(
+			`开关 forbidEmoteWhileHeadOccupied：${config.forbidEmoteWhileHeadOccupied ? "开" : "关（关着就不会拦）"}`
+		);
+		lines.push(`监控分组：${emoteBlockGroups().join(",")}`);
+
+		const rec = hooks.find((h) => h.target === "ChatRoomSendEmote");
+		lines.push(
+			`ChatRoomSendEmote hook：${
+				rec ? (rec.ok ? "已挂载" : `未挂载（${rec.error || "等待目标函数"}）`) : "未注册"
+			}`
+		);
+		lines.push(
+			`游戏里该函数：${typeof window.ChatRoomSendEmote === "function" ? "存在" : "不存在（版本可能已改）"}`
+		);
+		lines.push(`协议层兜底 emoteBlockAtProtocol：${config.emoteBlockAtProtocol ? "开" : "关"}`);
+
+		const P = player();
+		if (!P) {
+			lines.push("Player：尚未登录或界面未就绪");
+		} else {
+			const name = P.Nickname || P.Name || `#${P.MemberNumber}`;
+			const count = Array.isArray(P.Appearance) ? P.Appearance.length : "?";
+			lines.push(`Player：${name}，家族 ${P.AssetFamily}，外观 ${count} 件`);
+			for (const group of emoteBlockGroups()) {
+				let viaApi = "—";
+				try {
+					const item = typeof window.InventoryGet === "function" ? window.InventoryGet(P, group) : null;
+					viaApi = item && item.Asset ? item.Asset.Name || "有物品" : "空";
+				} catch (err) {
+					viaApi = "报错";
+				}
+				const viaScan = (Array.isArray(P.Appearance) ? P.Appearance : []).some(
+					(it) => it && it.Asset && it.Asset.Group && it.Asset.Group.Name === group
+				);
+				lines.push(`${group}：InventoryGet=${viaApi}，扫描=${viaScan ? "有物品" : "空"}`);
+			}
+			lines.push(`当前判定：${emoteForbidden() ? "会拦截" : "不会拦截"}`);
+		}
+
+		lines.push(
+			`已拦截 ${emoteBlockCount} 次${
+				lastEmoteBlock ? `，最近 ${lastEmoteBlock.at}（${lastEmoteBlock.group}：${lastEmoteBlock.asset}）` : ""
+			}`
+		);
+		lines.push(
+			"若戴着头饰发 *文字 后这里仍是 0：说明消息没走 ChatRoomSendEmote（常见于别的聊天增强 mod 直接发协议）→ /bcxfix on emoteBlockAtProtocol 再试"
+		);
 		return lines;
 	}
 
@@ -782,6 +943,20 @@
 						} else {
 							out.push(`当前公告：${String(config.emoteNoticeMessage).replace(/\{name\}|\$name/g, displayName())}`);
 						}
+					} else if (cmd === "emote" || cmd === "诊断") {
+						out.push(...emoteDiagnostics());
+					} else if (cmd === "group") {
+						const group = (parts[1] || "").trim();
+						if (group) {
+							const list = new Set(emoteBlockGroups());
+							if (list.has(group)) list.delete(group);
+							else list.add(group);
+							config.emoteBlockGroups = Array.from(list);
+							saveConfig();
+							out.push(`监控分组：${config.emoteBlockGroups.join(",") || "无"}`);
+						} else {
+							out.push(`监控分组：${emoteBlockGroups().join(",")}（用法 /bcxfix group ItemHood）`);
+						}
 					} else if (cmd === "reset") {
 						const fresh = Object.assign({}, DEFAULTS);
 						Object.keys(config).forEach((key) => delete config[key]);
@@ -791,7 +966,7 @@
 					} else {
 						out.push(...statusLines());
 						out.push(
-							"用法：/bcxfix on|off <键>；/bcxfix allowfriend|allowhearing <编号>；/bcxfix word <词>；/bcxfix notice <公告文本>；/bcxfix reset"
+							"用法：/bcxfix on|off <键>；/bcxfix allowfriend|allowhearing <编号>；/bcxfix word <词>；/bcxfix notice <公告文本>；/bcxfix emote（表情规则自检）；/bcxfix group <分组>；/bcxfix reset"
 						);
 					}
 
@@ -804,4 +979,7 @@
 			console.warn(`${TAG} 注册 /bcxfix 失败：`, err);
 		}
 	}
+
+	// 所有函数与状态都已就绪，最后再启动（顺序不要调换，理由见 waitForSdk 上方注释）
+	waitForSdk();
 })();
