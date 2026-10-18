@@ -8,11 +8,10 @@ BCX（Bondage Club Extended）1.1.22 里有几条规则挂的 hook 在 BC R133 �
 
 ## 安装（一键）
 
-装好 [Tampermonkey](https://www.tampermonkey.net/) 或 [Violentmonkey](https://violentmonkey.github.io/) 后，点下面这条链接，扩展会直接弹出安装页：
+装好 [Tampermonkey](https://www.tampermonkey.net/) 或 [Violentmonkey](https://violentmonkey.github.io/) 后，打开安装页点按钮，扩展会直接弹出安装窗口：
 
-```
-https://mrc0580.github.io/bcx-supplement/bcx-supplement.user.js
-```
+- 安装页：<https://mrc0580.github.io/bcx-supplement/>
+- 直接装脚本：<https://mrc0580.github.io/bcx-supplement/bcx-supplement.user.js>
 
 脚本里已经写死 `@updateURL` / `@downloadURL`，装的就是「会自己更新的版本」：
 

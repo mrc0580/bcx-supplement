@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BCX 失效规则补充包 · BC R133</title>
+<style>
+  :root {
+    --bg: #101114;
+    --panel: #17191d;
+    --line: #2a2d33;
+    --text: #e8eaed;
+    --muted: #9aa0a6;
+    --accent: #6ea8fe;
+    --ok: #57d9a3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.7 -apple-system, "Segoe UI", "Microsoft YaHei", Roboto, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 48px 20px 64px;
+  }
+  main { width: 100%; max-width: 720px; }
+  h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: .5px; }
+  .sub { color: var(--muted); margin: 0 0 28px; font-size: 14px; }
+  .badge {
+    display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--ok); margin-left: 8px; vertical-align: 3px;
+  }
+  .install {
+    display: block; text-align: center; text-decoration: none;
+    background: var(--accent); color: #0b0d10; font-weight: 700; font-size: 17px;
+    padding: 15px 20px; border-radius: 12px; margin: 0 0 10px;
+    transition: filter .15s ease;
+  }
+  .install:hover { filter: brightness(1.08); }
+  .hint { color: var(--muted); font-size: 13px; text-align: center; margin: 0 0 34px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 20px 22px; margin-bottom: 18px;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 12px; color: var(--text); }
+  ul { margin: 0; padding-left: 20px; }
+  li { margin: 5px 0; }
+  code {
+    background: #22252b; border: 1px solid var(--line); border-radius: 5px;
+    padding: 1px 6px; font-size: 12.5px;
+    font-family: ui-monospace, Consolas, "Cascadia Mono", monospace;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .muted { color: var(--muted); }
+  footer { margin-top: 30px; font-size: 12.5px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <h1>BCX 失效规则补充包<span class="badge">v1.2.0</span></h1>
+  <p class="sub">Bondage Club R133 · 用 bcModSdk 补回 BCX 1.1.22 里已经失效的规则</p>
+
+  <a class="install" href="./bcx-supplement.user.js">安装 / 更新脚本</a>
+  <p class="hint">需要先装 <a href="https://www.tampermonkey.net/">Tampermonkey</a> 或 <a href="https://violentmonkey.github.io/">Violentmonkey</a>。装好后会跟随本页自动更新。</p>
+
+  <div class="card">
+    <h2>包含的规则</h2>
+    <ul>
+      <li>Hide online friends if blind —— 失明时遮住好友名字/编号并禁用蜂鸣</li>
+      <li>Partial hearing / Hearing whitelist —— 部分听懂模糊语音 + 白名单</li>
+      <li>5 条关系规则 —— 禁止换主人、收新 sub、放弃 sub、新恋人、分手</li>
+      <li>Limit bound admin power —— 被束缚时限制房间管理动作</li>
+      <li><strong>自定义</strong>：头部栏有物品时禁止发送表情消息（<code>*文字</code>）</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>更新方式</h2>
+    <ul>
+      <li>篡改猴默认每 24 小时检查一次，也可以在扩展面板点「检查用户脚本更新」</li>
+      <li>只比对脚本头部 <code>@version</code>，版本号变大才会更新</li>
+      <li>更新后刷新游戏页面即生效，不需要重新粘贴代码</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>备用源</h2>
+    <ul>
+      <li>jsDelivr：<a href="https://fastly.jsdelivr.net/gh/mrc0580/bcx-supplement@main/bcx-supplement.user.js">fastly.jsdelivr.net</a>（分支引用约 12 小时缓存）</li>
+      <li>仓库主页：<a href="https://github.com/mrc0580/bcx-supplement">github.com/mrc0580/bcx-supplement</a></li>
+      <li>变更记录：<a href="./CHANGELOG.md">CHANGELOG.md</a></li>
+    </ul>
+  </div>
+
+  <footer>脚本只向 bcModSdk 注册一个 mod，不写游戏数据、不改存档；卸载 = 删掉脚本刷新。</footer>
+</main>
+</body>
+</html>
