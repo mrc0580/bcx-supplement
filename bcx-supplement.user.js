@@ -8,8 +8,8 @@
 // @match        https://bondageprojects.elementfx.com/*
 // @match        https://bondage-club.com/*
 // @match        https://www.bondage-club.com/*
-// @updateURL    https://raw.githubusercontent.com/mrc0580/bcx-supplement/main/bcx-supplement.user.js
-// @downloadURL  https://raw.githubusercontent.com/mrc0580/bcx-supplement/main/bcx-supplement.user.js
+// @updateURL    https://mrc0580.github.io/bcx-supplement/bcx-supplement.user.js
+// @downloadURL  https://mrc0580.github.io/bcx-supplement/bcx-supplement.user.js
 // @supportURL   https://github.com/mrc0580/bcx-supplement/issues
 // @homepageURL  https://github.com/mrc0580/bcx-supplement
 // @run-at       document-start

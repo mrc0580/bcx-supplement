@@ -11,7 +11,7 @@ BCX（Bondage Club Extended）1.1.22 里有几条规则挂的 hook 在 BC R133 �
 装好 [Tampermonkey](https://www.tampermonkey.net/) 或 [Violentmonkey](https://violentmonkey.github.io/) 后，点下面这条链接，扩展会直接弹出安装页：
 
 ```
-https://raw.githubusercontent.com/mrc0580/bcx-supplement/main/bcx-supplement.user.js
+https://mrc0580.github.io/bcx-supplement/bcx-supplement.user.js
 ```
 
 脚本里已经写死 `@updateURL` / `@downloadURL`，装的就是「会自己更新的版本」：
@@ -20,9 +20,17 @@ https://raw.githubusercontent.com/mrc0580/bcx-supplement/main/bcx-supplement.use
 - 检查时只比对脚本头部的 `@version`，**版本号变大才会更新**，所以每次改动都必须提升 `@version`；
 - 更新后刷新游戏页面即生效，不用重新粘贴代码。
 
-> 国内网络访问 `raw.githubusercontent.com` 可能不稳。备用链接（jsDelivr 镜像，内容一致）：
-> `https://cdn.jsdelivr.net/gh/mrc0580/bcx-supplement@main/bcx-supplement.user.js`
-> 用镜像装的脚本，把头部 `@updateURL` / `@downloadURL` 一起改成镜像地址，否则更新检查仍然走 raw。
+### 为什么用 github.io 而不是 raw.githubusercontent.com
+
+本机实测：`raw.githubusercontent.com` 在中国大陆**无法解析**（`curl` 立即失败，`nslookup` 查不到记录），所以 raw 链接既装不上、也检查不了更新。`https://mrc0580.github.io/...` 走的是 GitHub Pages 的 CDN，实测可访问，而且**每次 push 后自动重新构建**，不存在长缓存问题。
+
+备用源（内容一致，任选其一装，但装完要同步改头部 `@updateURL` / `@downloadURL`，否则更新检查仍指向原地址）：
+
+| 源 | 地址 | 特点 |
+|---|---|---|
+| GitHub Pages（默认） | `https://mrc0580.github.io/bcx-supplement/bcx-supplement.user.js` | 每次 push 即更新 |
+| jsDelivr | `https://fastly.jsdelivr.net/gh/mrc0580/bcx-supplement@main/bcx-supplement.user.js` | 稳，但分支引用有约 12 小时缓存 |
+| gh-proxy | `https://gh-proxy.com/https://raw.githubusercontent.com/mrc0580/bcx-supplement/main/bcx-supplement.user.js` | 第三方代理，长期可用性不保证 |
 
 ---
 
