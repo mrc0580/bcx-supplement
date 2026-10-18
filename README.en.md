@@ -104,6 +104,7 @@ Configuration lives in `localStorage["bcx-supplement.config.v1"]`. Three ways to
 ### Settings panel (new in v2.0, recommended)
 
 One card per rule; ticking a box applies immediately and saves automatically, so there is no key name to memorise.
+![BCX Supplement settings panel](docs/ui-panel.png)
 
 **Three entry points, all opening the same panel:**
 
