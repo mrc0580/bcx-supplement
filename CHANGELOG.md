@@ -2,6 +2,12 @@
 
 版本号规则：`主.次.修订`。修改后必须提升 `@version`，否则篡改猴不会拉取更新。
 
+## v1.2.1
+
+- 发布到 GitHub（`mrc0580/bcx-supplement`），启用 GitHub Pages 作为安装与更新源。
+- 保留原 `@namespace`（`bcx-supplement.local`），这样从 URL 安装时会**覆盖已有的旧脚本**，而不是变成两份。
+- 安装页：<https://mrc0580.github.io/bcx-supplement/>
+
 ## v1.2.0
 
 - **修正**：自定义规则改为拦截「表情消息」而不是「表情图标」。

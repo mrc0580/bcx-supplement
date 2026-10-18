@@ -4,7 +4,7 @@ BCX（Bondage Club Extended）1.1.22 里有几条规则挂的 hook 在 BC R133 �
 
 - 主文件：`bcx-supplement.user.js`
 - 适用：BC R128 及以上（好友列表改版之后），在 R133 上核对过全部 hook 目标
-- 当前版本：**v1.2.0**（变更记录见 [CHANGELOG.md](CHANGELOG.md)）
+- 当前版本：**v1.2.1**（变更记录见 [CHANGELOG.md](CHANGELOG.md)）
 
 ## 安装（一键）
 
@@ -66,7 +66,7 @@ BCX（Bondage Club Extended）1.1.22 里有几条规则挂的 hook 在 BC R133 �
 [BCX-Supplement] ✓ hooked SpeechTransformProcess  (speech_partial_hearing + alt_hearing_whitelist)
 [BCX-Supplement] ✓ hooked ServerSend  (rc_* / alt_room_admin_limit)
 [BCX-Supplement] ✓ hooked ChatRoomSendEmote  (forbid_emote_in_mask（新增）)
-[BCX-Supplement] 已加载 v1.2.0：5/5 个 hook 生效
+[BCX-Supplement] 已加载 v1.2.1：5/5 个 hook 生效
 ```
 
 脚本头部已经写好 `@match`，覆盖 `www.bondageprojects.elementfx.com` / `bondageprojects.elementfx.com` / `bondage-club.com`。如果你用的是别的镜像，把域名加进 `@match` 即可。
@@ -232,7 +232,7 @@ ServerSend("ChatRoomChat", { Type: "Emote", ... })
 篡改猴是靠脚本头部的 `@version` 判断要不要更新的，所以每次改动只要守住三步：
 
 1. **改代码**：编辑 `bcx-supplement.user.js`。
-2. **提升版本号**：把头部 `// @version      1.2.0` 改成 `1.2.1`（小修小补）或 `1.3.0`（加了新规则）。
+2. **提升版本号**：把头部 `// @version      1.2.1` 改成 `1.2.2`（小修小补）或 `1.3.0`（加了新规则）。
    版本号必须按 `主.次.修订` 三段递增，**不变就不会更新**。
 3. **推送**：
 

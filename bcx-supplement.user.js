@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC · BCX 失效规则补充包 (R133)
-// @namespace    https://github.com/mrc0580/bcx-supplement
-// @version      1.2.0
+// @namespace    bcx-supplement.local
+// @version      1.2.1
 // @description  补回 BCX (Bondage Club Extended) 在 BC R133 上已失效的规则：失明时隐藏在线好友、部分听力/听力白名单、关系控制、束缚时限制管理员权限；另附自定义规则「头部栏有物品时禁止发送表情消息」
 // @author       mrc0580
 // @match        https://www.bondageprojects.elementfx.com/*
@@ -38,7 +38,7 @@
 
 	const TAG = "[BCX-Supplement]";
 	const CFG_KEY = "bcx-supplement.config.v1";
-	const MOD_VERSION = "1.2.0";
+	const MOD_VERSION = "1.2.1";
 
 	/** 默认配置：全部开启，白名单为空 */
 	const DEFAULTS = {
