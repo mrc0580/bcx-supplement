@@ -6,7 +6,8 @@ BCX（Bondage Club Extended）1.1.22 里有几条规则挂的 hook 在 BC R133 �
 
 - 主文件：`bcx-supplement.user.js`
 - 适用：BC R128 及以上（好友列表改版之后），在 R133 上核对过全部 hook 目标
-- 当前版本：**v1.2.3**（变更记录见 [CHANGELOG.md](CHANGELOG.md)）
+- 当前版本：**v2.0.0**（变更记录见 [CHANGELOG.md](CHANGELOG.md)）
+- **v2.0 起自带设置面板**：每条规则一张卡片，可单独开关，带参数编辑与 hook 状态提示。入口在「偏好设置 → 扩展」、屏幕右侧悬浮按钮，或聊天框 `/bcxfix ui`
 
 ## 安装（一键）
 
@@ -95,11 +96,34 @@ FUSAM 支持用 URL 参数加载本地脚本（见官方文档「Developing an A
 
 ## 三、配置
 
-配置存在 `localStorage["bcx-supplement.config.v1"]`，两种改法：
+配置存在 `localStorage["bcx-supplement.config.v1"]`，三种改法（v2.0 起推荐用面板）。
+
+### 设置面板（v2.0 新增，推荐）
+
+每条规则一张卡片，勾选即时生效并自动保存，不用记键名。
+
+**三个入口，打开的是同一个面板：**
+
+| 入口 | 怎么进 |
+|---|---|
+| 偏好设置 → 扩展 | 游戏主界面 → Preferences → Extensions → 「BCX 补充包 / Supplement」（和 BCX 原版同一个位置） |
+| 悬浮按钮 | 屏幕右侧的 `BCX` 圆钮，一眼就能看见（可在「通用 → 显示屏幕悬浮按钮」里关掉） |
+| 聊天框 | 输入 `/bcxfix ui` 发送 |
+
+**界面说明：**
+
+- 顶部是分类标签，每个标着「已开启 / 总数」，例如 `听力 2/2`：全部 / 好友与视觉 / 听力 / 关系控制 / 房间管理 / 表情消息 / 通用；
+- 每张卡片：勾选框 + 中文规则名 + 右侧对应的 BCX 原规则名（`alt_hide_friends` 这类，方便和 BCX 对照）+ 一句话说明 + `hook 2/2` 生效状态徽标；
+- 规则自己的参数就在同一张卡片里，不用再去翻命令：白名单成员编号、可懂词表、公告文本、冷却毫秒、算作「头部」的装备分组；
+- 底部：`全部开启` / `全部关闭` / `恢复默认`，右下角显示 `hook 6/6 生效`；
+- `Esc` 或右上角 `×` 关闭，点面板外的空白处也能关。
+
+规则的清单在脚本里的 `RULES` 数组（连同 `RULE_GROUPS` 分类），面板、`/bcxfix` 状态、开关列表全部由它生成——以后加一条规则只要在这张表里加一项，界面自动出现。
 
 ### 聊天框命令 `/bcxfix`
 
 ```
+/bcxfix ui                    打开设置面板（等同于点悬浮按钮）
 /bcxfix                       查看所有开关与白名单
 /bcxfix off forbidNewSub      关掉某条（键名见下）
 /bcxfix on forbidNewSub       打开
@@ -115,6 +139,8 @@ FUSAM 支持用 URL 参数加载本地脚本（见官方文档「Developing an A
 ### 控制台
 
 ```js
+BCXSupplement.openSettings();  // 打开设置面板
+BCXSupplement.diag();          // 表情规则自检（同 /bcxfix emote）
 BCXSupplement.config.partialHearingRandom = false;
 BCXSupplement.config.partialHearingWords = ["hello", "please"];
 BCXSupplement.save();      // 不 save 则刷新后丢失
@@ -139,12 +165,13 @@ BCXSupplement.status();    // 看 hook 是否都挂上了
 | `forbidNewLover` | `true` | 禁止新恋人（恋爱→订婚→结婚不受影响） |
 | `forbidBreakLover` | `true` | 禁止与恋人分手 |
 | `limitAdminWhileRestrained` | `true` | 被束缚时禁掉除踢人/封禁外的房间管理动作 |
-| `forbidEmoteWhileHeadOccupied` | `true` | 头部栏（`ItemHead`）有物品时禁止发送表情消息（`*` 开头的 Emote 消息），并向房间公告 |
+| `forbidEmoteWhileHeadOccupied` | `true` | 头部栏有物品时禁止发送表情消息（`*` 开头的 Emote 消息），并向房间公告 |
 | `emoteBlockGroups` | `["ItemHead","ItemHood"]` | 哪些装备分组算「头部栏」。默认同时算 Head 栏和头套（很多面具/头罩其实是 `ItemHood`）；其它分组用 `/bcxfix group` 加 |
 | `emoteBlockAtProtocol` | `false` | 协议层兜底：有的聊天增强 mod 绕过 `ChatRoomSendEmote` 直接发消息，打开后在 `ServerSend` 再堵一道 |
 | `emoteNoticeMessage` | `"$name" tries to send an emotion, but failed due to he/she's in a mask` | 公告文本模板 |
 | `emoteNoticeCooldownMs` | `1500` | 公告冷却，防止连发刷屏（拦截本身不受冷却影响） |
 | `emoteKeepInputText` | `true` | 被拦下后把原文留在输入框，省得重打 |
+| `uiFloatingButton` | `true` | 屏幕右侧显示 BCX 悬浮按钮（关掉后从「偏好设置 → 扩展」进设置面板） |
 
 ---
 
@@ -160,6 +187,21 @@ BCXSupplement.status();    // 看 hook 是否都挂上了
 **延迟挂钩**：BC 的脚本按顺序同步加载，`bcModSdk` 出现时 `Screens/*.js` 里的函数可能还没定义。脚本对每个 hook 做「函数出现后再挂」，每 500ms 重试、最多 60 秒，所以不会因为加载顺序漏挂。
 
 **优先级**：从 ModSDK 源码看，`hookFunction` 的 priority 越大越靠外层（先执行、后置代码最后执行）。所以过滤类 hook 用高优先级（10），保证看到的是最终结果。
+
+### 设置面板怎么接进游戏（v2.0）
+
+面板本身是普通 DOM（挂在 `document.body` 上，`z-index` 高于游戏画布），关键是入口用的是 BC 官方给第三方扩展的 API：
+
+```js
+PreferenceRegisterExtensionSetting({ Identifier, ButtonText, Image, load, run, click, exit, unload });
+```
+
+- 注册后按钮会出现在「偏好设置 → 扩展」里，BCX 原版也是这么挂的，所以玩家找得到；
+- BC 在 `PreferenceSubscreenExtensionsRun` 里会**一直调 `run()` 而不画角色**，所以扩展界面必须自绘——我们塞的是自己的 DOM，`run` / `click` 留空即可；
+- 从面板点 × 要主动调 `PreferenceSubscreenExtensionsClear()` 才能回到扩展列表；而 BC 自己收起界面时（`exit` / `unload`）**不要**再调它，否则会把自己又拉回列表。所以 `closeSettings(fromGame)` 用一个参数区分这两种情况。
+- 另一条入口是聊天框 `/bcxfix ui` 和悬浮按钮，它们直接 `openSettings()`，不走偏好设置那套生命周期。
+
+规则清单是单一数据源：`RULES`（每条规则 + `fields` 子参数）和 `RULE_GROUPS`（分类）。面板、`/bcxfix` 状态输出、`on|off` 的可用键名、`全部开启/关闭` 全都从这张表生成，加规则只需加一项，界面自动出现。
 
 ### 新增规则「头部有物品时禁止发送表情消息」怎么实现的
 
@@ -227,8 +269,13 @@ ServerSend("ChatRoomChat", { Type: "Emote", ... })
 | 普通说话 | 同一状态下输入 `hello`（不带 `*`） | 正常发出（本规则不管普通聊天） |
 | 表情图标 | 同一状态下改脸上的表情（表情面板点选） | **不受影响**，正常生效（本规则不管表情图标） |
 | 摘掉头饰 | 摘下 Head 栏物品再发 `*waves` | 正常发出 |
-| 状态自查 | `/bcxfix` | 显示 10 个开关 + 白名单 + 「头部栏」当前物品 + hook 是否全部生效 |
+| 状态自查 | `/bcxfix` | 显示 15 个开关 + 白名单 + 「头部栏」当前物品 + hook 是否全部生效 |
 | 表情规则自检 | `/bcxfix emote` | 显示开关、监控分组、hook 状态、每个分组里的物品、当前判定、已拦截次数 |
+| 设置面板 | 偏好设置 → 扩展 → 「BCX 补充包 / Supplement」 | 面板打开，7 个分类标签、11 张规则卡，底部显示 `hook 6/6 生效` |
+| 悬浮按钮 | 点屏幕右侧的 `BCX` 圆钮 | 同上；在「通用 → 显示屏幕悬浮按钮」里可以关掉它 |
+| 面板开关 | 去掉「听力白名单」的勾 | 卡片变灰，刷新页面后仍是关闭状态（已写 localStorage） |
+| 全部关闭/开启 | 点底部「全部关闭」再「全部开启」 | 所有卡片跟着变灰/恢复；表情规则随之失效/生效 |
+| 关掉失明规则 | 失明状态下打开好友列表，再在面板里关掉「失明时隐藏在线好友」 | 已遮罩的行立刻恢复成真实名字与编号 |
 
 如果 `/bcxfix` 里显示「未生效 hook」，把控制台的 `[BCX-Supplement]` 日志发我，多半是 BC 又改版了。
 
@@ -239,7 +286,7 @@ ServerSend("ChatRoomChat", { Type: "Emote", ... })
 篡改猴是靠脚本头部的 `@version` 判断要不要更新的，所以每次改动只要守住三步：
 
 1. **改代码**：编辑 `bcx-supplement.user.js`。
-2. **提升版本号**：把头部 `// @version      1.2.1` 改成 `1.2.2`（小修小补）或 `1.3.0`（加了新规则）。
+2. **提升版本号**：把头部 `// @version      2.0.0` 改成 `2.0.1`（小修小补）、`2.1.0`（加了新规则）或 `3.0.0`（界面/结构大改）。
    版本号必须按 `主.次.修订` 三段递增，**不变就不会更新**。
 3. **推送**：
 
@@ -273,8 +320,8 @@ git push
 
 v1.2.2 起内置了自检命令，按这个顺序看（命令要敲在**游戏里的聊天输入框**，不是浏览器控制台——控制台里 `/` 会被当成正则开头，报 `Invalid regular expression`；控制台请用 `BCXSupplement.diag()`）：
 
-1. **确认脚本版本**：篡改猴面板里必须是 `1.2.2`。1.1.x 拦的是脸上的表情图标，不是 `*文字`；1.2.0/1.2.1 有下面表里的两个坑。手动点一次「检查用户脚本更新」，或重开安装页装一次。
-2. **确认 6 个 hook 全绿**：控制台搜 `[BCX-Supplement]`，最后一行应为 `已加载 v1.2.2：6/6 个 hook 生效`。
+1. **确认脚本版本**：篡改猴面板里必须是 `2.0.0` 或更新。1.1.x 拦的是脸上的表情图标，不是 `*文字`；1.2.0/1.2.1 有下面表里的两个坑。手动点一次「检查用户脚本更新」，或重开安装页装一次。
+2. **确认 6 个 hook 全绿**：控制台搜 `[BCX-Supplement]`，最后一行应为 `已加载 v2.0.0：6/6 个 hook 生效`。
 3. **聊天框敲 `/bcxfix emote`**，逐项对照：
    - `开关 …：关` → `/bcxfix on forbidEmoteWhileHeadOccupied`
    - `ChatRoomSendEmote hook：未挂载` → BC 又改版了，把控制台日志发出来

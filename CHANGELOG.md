@@ -2,6 +2,25 @@
 
 版本号规则：`主.次.修订`。修改后必须提升 `@version`，否则篡改猴不会拉取更新。
 
+## v2.0.0
+
+**可视化设置面板**，参照原版 BCX 的「规则列表」形态：每条规则一张卡片，可以单独开关，参数就在卡片里改。
+
+- **三个入口，同一套面板**：
+  - 偏好设置 → 扩展 → 「BCX 补充包 / Supplement」（走 BC 官方的 `PreferenceRegisterExtensionSetting`，BCX 原版也挂在这里）；
+  - 屏幕右侧的 `BCX` 悬浮按钮（`uiFloatingButton`，默认开，可关）；
+  - 聊天框 `/bcxfix ui`，或控制台 `BCXSupplement.openSettings()`。
+- **面板结构**：顶部 7 个分类标签（全部 / 好友与视觉 / 听力 / 关系控制 / 房间管理 / 表情消息 / 通用），标签上带「已开启/总数」；每张卡片含勾选框、中文名、右侧对应 BCX 原规则 ID、说明、`hook n/n` 生效徽标；底部「全部开启 / 全部关闭 / 恢复默认」+ 总体 `hook 6/6 生效`；`Esc`、`×`、点遮罩都能关。
+- **参数进卡片**：白名单成员编号、可懂词表、公告文本与冷却、监控分组、`emoteKeepInputText`、`emoteBlockAtProtocol` 全部可视化编辑，勾选/改动即时写 localStorage 并生效，没有「保存」按钮。
+- **规则改为单一数据源**：新增 `RULES`（规则 + 字段）与 `RULE_GROUPS`（分类）两张表，面板、`/bcxfix` 状态、`on|off` 键名、批量开关全部由它们生成。以后加规则只改表，界面自动出现。
+- 关掉「失明时隐藏在线好友」时，已遮罩的好友行会立即还原（新增 `unmaskFriendList()`，名字从 `Player.FriendNames` / 缓存取）。为此 `maskFriendList()` 现在也会记住原始名字。
+- 拦截公告文本框留空 = 只在本地拦截、不向房间播报（之前空值会发出去一条只有 `*` 的消息）。
+- 新增 `uiFloatingButton`（默认 `true`）配置键。
+- 面板与悬浮按钮可被 `BCXSupplement.openSettings()` / `closeSettings()` 操作；`BCXSupplement.maskFriendList` / `unmaskFriendList` 也一并暴露，便于排查。
+- 修复：`document-start` 早期注入时 `document.body` / `head` 还没就绪，悬浮按钮与样式会静默不创建；现在带延迟重试。
+- 修复：从偏好设置里按 BC 的返回键离开时，会被 `PreferenceSubscreenExtensionsClear()` 又拉回扩展列表；`closeSettings(fromGame)` 现在区分「自己点 ×」和「BC 自己收起」。
+- 文档：中英文 README 各加「设置面板」章节、`uiFloatingButton` 键名、7 条界面自测项。
+
 ## v1.2.3
 
 - **默认监控分组加入 `ItemHood`**：`emoteBlockGroups` 默认值从 `["ItemHead"]` 改为 `["ItemHead","ItemHood"]`。BC 里很多「面具/头罩」其实挂在 Hood 栏（`ItemHood`），只认 `ItemHead` 会漏判，表现就是规则完全没反应。

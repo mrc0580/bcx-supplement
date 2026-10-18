@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         BC · BCX 失效规则补充包 (R133)
 // @namespace    bcx-supplement.local
-// @version      1.2.3
-// @description  补回 BCX (Bondage Club Extended) 在 BC R133 上已失效的规则：失明时隐藏在线好友、部分听力/听力白名单、关系控制、束缚时限制管理员权限；另附自定义规则「头部栏有物品时禁止发送表情消息」
+// @version      2.0.0
+// @description  补回 BCX (Bondage Club Extended) 在 BC R133 上已失效的规则：失明时隐藏在线好友、部分听力/听力白名单、关系控制、束缚时限制管理员权限；另附自定义规则「头部栏有物品时禁止发送表情消息」。v2.0 提供可视化设置面板，每条规则可单独开关（偏好设置 → 扩展，或屏幕右侧悬浮按钮）
 // @author       mrc0580
 // @match        https://www.bondageprojects.elementfx.com/*
 // @match        https://bondageprojects.elementfx.com/*
@@ -38,7 +38,7 @@
 
 	const TAG = "[BCX-Supplement]";
 	const CFG_KEY = "bcx-supplement.config.v1";
-	const MOD_VERSION = "1.2.3";
+	const MOD_VERSION = "2.0.0";
 
 	/** 默认配置：全部开启，白名单为空 */
 	const DEFAULTS = {
@@ -81,7 +81,192 @@
 		// 协议层兜底：有些聊天增强 mod（WCE 等）会绕过 ChatRoomSendEmote 直接发消息，
 		// 打开这个开关后在 ServerSend 再堵一道（默认关，避免误伤游戏自带旁白）
 		emoteBlockAtProtocol: false,
+
+		// 界面：屏幕右侧的悬浮按钮（点开设置面板）。可以关掉，改用偏好设置里的入口。
+		uiFloatingButton: true,
 	};
+
+	// ---------------------------------------------------------------------
+	// 规则清单（v2.0 的单一数据源）
+	//
+	// 设置面板、/bcxfix 状态、开关列表全部从这里生成，加规则只要在这里加一项：
+	//   key    配置键（DEFAULTS 里的同名键）
+	//   group  所属分类（RULE_GROUPS 的 id）
+	//   zh/en  规则名（en 对应 BCX 里的原规则名，方便对照）
+	//   desc   一句话说明
+	//   fields 该规则的子参数（开关 / 数字 / 文本 / 列表）
+	// ---------------------------------------------------------------------
+
+	const RULE_GROUPS = [
+		{ id: "vision", zh: "好友与视觉", en: "Friends & Vision" },
+		{ id: "speech", zh: "听力", en: "Hearing" },
+		{ id: "relation", zh: "关系控制", en: "Relationships" },
+		{ id: "room", zh: "房间管理", en: "Room admin" },
+		{ id: "emote", zh: "表情消息（自定义）", en: "Emotes (custom)" },
+		{ id: "general", zh: "通用", en: "General" },
+	];
+
+	const RULES = [
+		{
+			key: "hideFriendsWhenBlind",
+			group: "vision",
+			zh: "失明时隐藏在线好友",
+			en: "Hide online friends if blind",
+			bcx: "alt_hide_friends",
+			desc: "完全失明时把好友列表的昵称与编号遮成 Someone / ######，并去掉「发送蜂鸣」动作。",
+			fields: [
+				{
+					key: "friendsVisible",
+					type: "list",
+					numeric: true,
+					zh: "例外成员编号",
+					en: "Exceptions (member numbers)",
+					hint: "依然可见的成员，用逗号或空格分隔，例如 12345, 67890",
+				},
+			],
+		},
+		{
+			key: "partialHearing",
+			group: "speech",
+			zh: "部分听力",
+			en: "Partial hearing",
+			bcx: "speech_partial_hearing",
+			desc: "失聪时不再全部听不懂：部分词仍能听清（默认每个词 25% 概率听懂，另有固定可懂词表）。",
+			fields: [
+				{ key: "partialHearingRandom", type: "switch", zh: "随机听懂 25%", en: "Random 25% understood" },
+				{
+					key: "partialHearingWords",
+					type: "list",
+					zh: "永远听得懂的词",
+					en: "Always understood words",
+					hint: "用逗号分隔，例如 hello, please, stop",
+				},
+			],
+		},
+		{
+			key: "hearingWhitelist",
+			group: "speech",
+			zh: "听力白名单",
+			en: "Hearing whitelist",
+			bcx: "alt_hearing_whitelist",
+			desc: "白名单里的成员对你说话时，即使你失聪也能完全听懂。",
+			fields: [
+				{
+					key: "hearingWhitelistMembers",
+					type: "list",
+					numeric: true,
+					zh: "白名单成员编号",
+					en: "Whitelisted member numbers",
+					hint: "用逗号分隔，例如 12345, 67890",
+				},
+				{
+					key: "hearingWhitelistIgnoreGagged",
+					type: "switch",
+					zh: "对方被堵嘴时也听得懂",
+					en: "Understand even when the speaker is gagged",
+				},
+			],
+		},
+		{
+			key: "forbidNewOwner",
+			group: "relation",
+			zh: "禁止换 / 离开主人",
+			en: "Forbid club owner changes",
+			bcx: "rc_owner_change",
+			desc: "不接受新的主人，也不主动解除与现任主人的关系（试用期转正不受影响）。",
+		},
+		{
+			key: "forbidNewSub",
+			group: "relation",
+			zh: "禁止收新的 sub",
+			en: "Forbid taking new submissives",
+			bcx: "rc_take_sub",
+			desc: "不向别人发出收 sub 的请求（已成为你的试用 sub 的转正请求仍然允许）。",
+		},
+		{
+			key: "forbidReleaseSub",
+			group: "relation",
+			zh: "禁止放弃 sub",
+			en: "Forbid disowning submissives",
+			bcx: "rc_release_sub",
+			desc: "不允许自己主动释放已有的 sub。",
+		},
+		{
+			key: "forbidNewLover",
+			group: "relation",
+			zh: "禁止新的恋人",
+			en: "Forbid getting new lovers",
+			bcx: "rc_new_lover",
+			desc: "不接受新的恋人关系（已与你互为恋人的求婚/升级仍然允许）。",
+		},
+		{
+			key: "forbidBreakLover",
+			group: "relation",
+			zh: "禁止与恋人分手",
+			en: "Forbid breaking up with lovers",
+			bcx: "rc_break_lover",
+			desc: "不允许主动与恋人解除关系。",
+		},
+		{
+			key: "limitAdminWhileRestrained",
+			group: "room",
+			zh: "束缚时限制管理权限",
+			en: "Limit bound admin power",
+			bcx: "alt_room_admin_limit",
+			desc: "被束缚时不能执行房间管理操作（踢人 / 封禁除外）。",
+		},
+		{
+			key: "forbidEmoteWhileHeadOccupied",
+			group: "emote",
+			zh: "头部有物品时禁止发送表情消息",
+			en: "Forbid emote messages while the head slot is occupied",
+			bcx: "（本补充包新增，BCX 没有）",
+			desc: "头上戴着面具/头套时，用 *文字、/me、:文字 等方式发出的表情消息会被拦下，并向房间公告。",
+			fields: [
+				{
+					key: "emoteBlockGroups",
+					type: "list",
+					zh: "算作「头部」的装备分组",
+					en: "Groups treated as the head slot",
+					hint: "默认 ItemHead（Head 栏）与 ItemHood（头套），用逗号分隔",
+				},
+				{
+					key: "emoteNoticeMessage",
+					type: "text",
+					zh: "拦截公告",
+					en: "Blocked announcement",
+					hint: "$name 或 {name} 会替换成你的昵称；留空则不公告",
+				},
+				{
+					key: "emoteNoticeCooldownMs",
+					type: "number",
+					zh: "公告冷却（毫秒）",
+					en: "Announcement cooldown (ms)",
+					hint: "避免连续发送时刷屏，0 表示不限制",
+				},
+				{
+					key: "emoteKeepInputText",
+					type: "switch",
+					zh: "被拦下时把文字留在输入框",
+					en: "Keep the text in the input box",
+				},
+				{
+					key: "emoteBlockAtProtocol",
+					type: "switch",
+					zh: "协议层兜底（其它聊天 mod 绕过时用）",
+					en: "Protocol-level backstop",
+				},
+			],
+		},
+		{
+			key: "uiFloatingButton",
+			group: "general",
+			zh: "显示屏幕悬浮按钮",
+			en: "Show floating button",
+			bcx: "（本补充包新增）",
+			desc: "屏幕右侧显示一个 BCX 按钮，点开这个设置面板。关掉后可以从「偏好设置 → 扩展」进入。",
+		},
+	];
 
 	// ---------------------------------------------------------------------
 	// 配置读写
@@ -268,6 +453,7 @@
 		installEmoteFix();
 		installEmoteProtocolBackstop();
 		registerCommand();
+		installUi();
 
 		window.BCXSupplement = {
 			version: MOD_VERSION,
@@ -275,6 +461,13 @@
 			save: saveConfig,
 			status: () => ({ hooks: hooks.slice(), config: Object.assign({}, config) }),
 			notify,
+			rules: () => RULES.map((rule) => Object.assign({}, rule)),
+			// 打开 / 关闭设置面板（控制台与 /bcxfix ui 都用这个）
+			openSettings,
+			closeSettings,
+			// 调试用：手动触发好友列表遮罩 / 还原
+			maskFriendList,
+			unmaskFriendList,
 			// 控制台用：BCXSupplement.diag() 打印表情规则自检
 			diag: () => {
 				const lines = emoteDiagnostics();
@@ -342,6 +535,10 @@
 			if (!numberCell.dataset.bcxMemberNumber) {
 				const raw = (numberCell.textContent || "").replace(/[^\d]/g, "");
 				if (raw) numberCell.dataset.bcxMemberNumber = raw;
+			}
+			// 名字也留一份，关掉规则时用来还原（Player.FriendNames 取不到时兜底）
+			if (!nameCell.dataset.bcxName && nameCell.textContent !== "Someone") {
+				nameCell.dataset.bcxName = nameCell.textContent || "";
 			}
 			const memberNumber = Number(numberCell.dataset.bcxMemberNumber);
 			if (Number.isFinite(memberNumber) && allowed.has(memberNumber)) return;
@@ -714,7 +911,10 @@
 		if (Number.isFinite(cooldown) && cooldown > 0 && now - lastEmoteNotice < cooldown) return;
 		lastEmoteNotice = now;
 
-		const template = String(config.emoteNoticeMessage || DEFAULTS.emoteNoticeMessage);
+		const template = String(
+			config.emoteNoticeMessage == null ? DEFAULTS.emoteNoticeMessage : config.emoteNoticeMessage
+		).trim();
+		if (!template) return; // 公告留空 = 只在本地拦截，不向房间播报
 		const text = template.replace(/\{name\}|\$name/g, displayName());
 
 		try {
@@ -820,24 +1020,27 @@
 	// /bcxfix 命令：查看状态、快速切换
 	// ---------------------------------------------------------------------
 
-	const TOGGLES = [
-		["hideFriendsWhenBlind", "失明时隐藏好友"],
-		["partialHearing", "部分听力"],
-		["hearingWhitelist", "听力白名单"],
-		["forbidNewOwner", "禁止换/离开主人"],
-		["forbidNewSub", "禁止收新 sub"],
-		["forbidReleaseSub", "禁止放弃 sub"],
-		["forbidNewLover", "禁止新恋人"],
-		["forbidBreakLover", "禁止与恋人分手"],
-		["limitAdminWhileRestrained", "束缚时限制管理"],
-		["forbidEmoteWhileHeadOccupied", "头部有物品时禁止发送表情消息"],
-		["emoteBlockAtProtocol", "表情消息协议层兜底（可选）"],
-	];
+	/**
+	 * 所有布尔开关（规则本身 + 规则下的子开关），供 /bcxfix 显示与 on|off 使用。
+	 * 从 RULES 派生，避免和界面里的清单各写一份、改一处忘另一处。
+	 */
+	function allSwitchKeys() {
+		const out = [];
+		RULES.forEach((rule) => {
+			out.push({ key: rule.key, zh: rule.zh, en: rule.en });
+			(rule.fields || []).forEach((field) => {
+				if (field.type === "switch") out.push({ key: field.key, zh: field.zh, en: field.en });
+			});
+		});
+		return out;
+	}
+
+	const TOGGLES = allSwitchKeys();
 
 	function statusLines() {
 		const lines = [`BCX 补充包 v${MOD_VERSION}`];
-		for (const [key, label] of TOGGLES) {
-			lines.push(`${config[key] ? "开" : "关"}  ${label}  (${key})`);
+		for (const item of TOGGLES) {
+			lines.push(`${config[item.key] ? "开" : "关"}  ${item.zh}  (${item.key})`);
 		}
 		lines.push(`可见好友：${(config.friendsVisible || []).join(",") || "无"}`);
 		lines.push(`听力白名单：${(config.hearingWhitelistMembers || []).join(",") || "无"}`);
@@ -1005,16 +1208,21 @@
 						} else {
 							out.push(`监控分组：${emoteBlockGroups().join(",")}（用法 /bcxfix group ItemHood）`);
 						}
+					} else if (cmd === "ui" || cmd === "menu" || cmd === "设置" || cmd === "界面") {
+						openSettings();
+						out.push("设置面板已打开（Esc 或点右上角 × 关闭）");
 					} else if (cmd === "reset") {
 						const fresh = Object.assign({}, DEFAULTS);
 						Object.keys(config).forEach((key) => delete config[key]);
 						Object.assign(config, fresh);
 						saveConfig();
+						afterConfigChange("hideFriendsWhenBlind");
+						afterConfigChange("uiFloatingButton");
 						out.push("配置已重置为默认值");
 					} else {
 						out.push(...statusLines());
 						out.push(
-							"用法：/bcxfix on|off <键>；/bcxfix allowfriend|allowhearing <编号>；/bcxfix word <词>；/bcxfix notice <公告文本>；/bcxfix emote（表情规则自检）；/bcxfix group <分组>；/bcxfix reset"
+							"用法：/bcxfix ui（打开设置面板）；/bcxfix on|off <键>；/bcxfix allowfriend|allowhearing <编号>；/bcxfix word <词>；/bcxfix notice <公告文本>；/bcxfix emote（表情规则自检）；/bcxfix group <分组>；/bcxfix reset"
 						);
 					}
 
@@ -1026,6 +1234,618 @@
 		} catch (err) {
 			console.warn(`${TAG} 注册 /bcxfix 失败：`, err);
 		}
+	}
+
+	// ---------------------------------------------------------------------
+	// v2.0 设置界面
+	//
+	// 三个入口，同一套面板：
+	//   1. 偏好设置 → 扩展 → 「BCX 补充包」（走 BC 官方的
+	//      PreferenceRegisterExtensionSetting，和 BCX 在原版里的入口一致）
+	//   2. 屏幕右侧的悬浮按钮（可以在面板里关掉）
+	//   3. 聊天框 /bcxfix ui，或控制台 BCXSupplement.openSettings()
+	//
+	// 布局按 BCX 的规则列表习惯：上方分类标签，下面一条规则一张卡片，
+	// 勾选即写 localStorage 立即生效，没有「保存」按钮。
+	// ---------------------------------------------------------------------
+
+	const UI_ROOT_ID = "bcxfix-ui";
+	const UI_STYLE_ID = "bcxfix-ui-style";
+	const UI_FAB_ID = "bcxfix-fab";
+	const UI_ICON =
+		"data:image/svg+xml;charset=utf-8," +
+		encodeURIComponent(
+			'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">' +
+				'<rect x="2" y="2" width="60" height="60" rx="12" fill="#242433" stroke="#7f7fd6" stroke-width="4"/>' +
+				'<path d="M17 41 L32 18 L47 41" fill="none" stroke="#cfcfff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>' +
+				'<circle cx="32" cy="47" r="4" fill="#cfcfff"/></svg>'
+		);
+
+	/** 每条规则依赖哪个 hook，用来在卡片上标「生效 / 未挂载」 */
+	const RULE_HOOKS = {
+		hideFriendsWhenBlind: ["FriendListLoadFriendList", "FriendListGetAvailableActions"],
+		partialHearing: ["SpeechTransformProcess"],
+		hearingWhitelist: ["SpeechTransformProcess"],
+		forbidNewOwner: ["ServerSend"],
+		forbidNewSub: ["ServerSend"],
+		forbidReleaseSub: ["ServerSend"],
+		forbidNewLover: ["ServerSend"],
+		forbidBreakLover: ["ServerSend"],
+		limitAdminWhileRestrained: ["ServerSend"],
+		forbidEmoteWhileHeadOccupied: ["ChatRoomSendEmote"],
+	};
+
+	const UI_CSS = `
+#${UI_ROOT_ID}, #${UI_ROOT_ID} * { box-sizing: border-box; font-family: Consolas, "Courier New", monospace; }
+#${UI_ROOT_ID} {
+	position: fixed; inset: 0; z-index: 999999; display: flex; align-items: center; justify-content: center;
+	background: rgba(0, 0, 0, 0.72);
+}
+#${UI_ROOT_ID} .bcxfix-panel {
+	width: min(960px, 94vw); height: min(740px, 90vh); display: flex; flex-direction: column;
+	background: #1b1b23; color: #e9e9f2; border: 2px solid #6f6fae; border-radius: 10px;
+	box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7); overflow: hidden;
+}
+#${UI_ROOT_ID} .bcxfix-head {
+	display: flex; align-items: center; gap: 12px; padding: 14px 18px;
+	background: linear-gradient(180deg, #2b2b3d, #232331); border-bottom: 1px solid #3c3c54;
+}
+#${UI_ROOT_ID} .bcxfix-logo { width: 40px; height: 40px; image-rendering: pixelated; }
+#${UI_ROOT_ID} .bcxfix-title { font-size: 19px; font-weight: bold; letter-spacing: 0.5px; }
+#${UI_ROOT_ID} .bcxfix-sub { font-size: 12px; color: #9c9cb8; margin-top: 2px; }
+#${UI_ROOT_ID} .bcxfix-close {
+	margin-left: auto; width: 34px; height: 34px; border-radius: 6px; cursor: pointer;
+	background: #3a3a52; color: #d8d8ea; border: 1px solid #55557a; font-size: 20px; line-height: 1;
+}
+#${UI_ROOT_ID} .bcxfix-close:hover { background: #6b3a4c; border-color: #a05a72; color: #fff; }
+#${UI_ROOT_ID} .bcxfix-tabs {
+	display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 18px;
+	background: #20202b; border-bottom: 1px solid #34344a;
+}
+#${UI_ROOT_ID} .bcxfix-tab {
+	padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;
+	background: #2b2b3b; color: #b9b9d0; border: 1px solid #3d3d57;
+}
+#${UI_ROOT_ID} .bcxfix-tab:hover { background: #35354b; color: #e6e6f5; }
+#${UI_ROOT_ID} .bcxfix-tab.active { background: #55558f; border-color: #8b8bd0; color: #fff; }
+#${UI_ROOT_ID} .bcxfix-tab .num { opacity: 0.7; margin-left: 6px; font-size: 12px; }
+#${UI_ROOT_ID} .bcxfix-body { flex: 1; overflow-y: auto; padding: 14px 18px 20px; }
+#${UI_ROOT_ID} .bcxfix-group {
+	margin: 14px 0 8px; font-size: 12px; letter-spacing: 1px; color: #8282a8;
+	border-bottom: 1px dashed #34344a; padding-bottom: 4px;
+}
+#${UI_ROOT_ID} .bcxfix-group:first-child { margin-top: 0; }
+#${UI_ROOT_ID} .bcxfix-card {
+	background: #24242f; border: 1px solid #38384d; border-left: 4px solid #7f7fd6;
+	border-radius: 8px; padding: 12px 14px; margin-bottom: 10px;
+}
+#${UI_ROOT_ID} .bcxfix-card.off { border-left-color: #4a4a5e; opacity: 0.62; }
+#${UI_ROOT_ID} .bcxfix-card-head { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+#${UI_ROOT_ID} .bcxfix-card-head input { width: 17px; height: 17px; cursor: pointer; accent-color: #7f7fd6; }
+#${UI_ROOT_ID} .bcxfix-name { font-size: 15px; font-weight: bold; color: #f0f0fa; }
+#${UI_ROOT_ID} .bcxfix-bcx { margin-left: auto; font-size: 11px; color: #8585a8; text-align: right; }
+#${UI_ROOT_ID} .bcxfix-desc { font-size: 12.5px; color: #a9a9c2; margin: 8px 0 0 27px; line-height: 1.5; }
+#${UI_ROOT_ID} .bcxfix-fields { margin: 10px 0 0 27px; display: flex; flex-direction: column; gap: 8px; }
+#${UI_ROOT_ID} .bcxfix-field { display: flex; flex-direction: column; gap: 3px; }
+#${UI_ROOT_ID} .bcxfix-field.inline { flex-direction: row; align-items: center; gap: 8px; }
+#${UI_ROOT_ID} .bcxfix-label { font-size: 12px; color: #c4c4dc; }
+#${UI_ROOT_ID} .bcxfix-input {
+	width: 100%; padding: 6px 8px; border-radius: 5px; font-size: 13px;
+	background: #16161d; color: #e9e9f2; border: 1px solid #43435e;
+}
+#${UI_ROOT_ID} .bcxfix-input:focus { outline: none; border-color: #8b8bd0; box-shadow: 0 0 0 2px rgba(127, 127, 214, 0.25); }
+#${UI_ROOT_ID} .bcxfix-hint { font-size: 11.5px; color: #7d7d9a; }
+#${UI_ROOT_ID} .bcxfix-badge { font-size: 11px; padding: 1px 6px; border-radius: 4px; }
+#${UI_ROOT_ID} .bcxfix-badge.ok { background: #23402f; color: #86d8a6; }
+#${UI_ROOT_ID} .bcxfix-badge.bad { background: #4a2430; color: #f0a0b4; }
+#${UI_ROOT_ID} .bcxfix-foot {
+	display: flex; align-items: center; gap: 8px; padding: 10px 18px;
+	background: #20202b; border-top: 1px solid #34344a; font-size: 12px; color: #9a9ab6;
+}
+#${UI_ROOT_ID} .bcxfix-btn {
+	padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;
+	background: #2f2f43; color: #dcdcf0; border: 1px solid #45456a;
+}
+#${UI_ROOT_ID} .bcxfix-btn:hover { background: #3d3d58; border-color: #6f6fae; }
+#${UI_ROOT_ID} .bcxfix-credit { margin-left: auto; }
+#${UI_FAB_ID} {
+	position: fixed; right: 12px; bottom: 116px; width: 48px; height: 48px; border-radius: 50%;
+	z-index: 9000; cursor: pointer; padding: 0; border: 2px solid #7f7fd6;
+	background: #242433; color: #d8d8f6; font: bold 13px/1 Consolas, "Courier New", monospace;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55); opacity: 0.9;
+}
+#${UI_FAB_ID}:hover { opacity: 1; background: #3a3a58; transform: scale(1.06); }
+`;
+
+	let uiRoot = null;
+	let uiMode = "standalone"; // standalone（指令/按钮打开） | embedded（偏好设置里打开）
+	let uiTab = "all";
+	let uiHookTimer = null;
+	let uiPrefRegistered = false;
+	let uiPendingOpen = false;
+
+	/** 极简元素构造：attrs 支持 class / text / 事件（on开头的函数）/ 普通属性 */
+	function el(tag, attrs, children) {
+		const node = document.createElement(tag);
+		if (attrs) {
+			Object.keys(attrs).forEach((key) => {
+				const value = attrs[key];
+				if (value == null) return;
+				if (key === "class") node.className = value;
+				else if (key === "text") node.textContent = value;
+				else if (key.slice(0, 2) === "on" && typeof value === "function")
+					node.addEventListener(key.slice(2), value);
+				else if (key === "checked" || key === "value") node[key] = value;
+				else node.setAttribute(key, value);
+			});
+		}
+		(Array.isArray(children) ? children : children == null ? [] : [children]).forEach((child) => {
+			if (child != null) node.append(child);
+		});
+		return node;
+	}
+
+	let uiStyleAdded = false;
+	function ensureUiStyle() {
+		if (uiStyleAdded) return;
+		if (!document.head) {
+			// document-start 阶段 head 可能还没就绪
+			setTimeout(ensureUiStyle, 200);
+			return;
+		}
+		const style = document.createElement("style");
+		style.id = UI_STYLE_ID;
+		style.textContent = UI_CSS;
+		document.head.append(style);
+		uiStyleAdded = true;
+	}
+
+	function ruleEnabled(rule) {
+		return !!config[rule.key];
+	}
+
+	/** 某个分类下「已开启 / 总数」 */
+	function groupCounts(groupId) {
+		const rules = RULES.filter((rule) => rule.group === groupId);
+		const on = rules.filter(ruleEnabled).length;
+		return { on, total: rules.length };
+	}
+
+	function hookBadge(rule) {
+		const targets = RULE_HOOKS[rule.key] || [];
+		if (!targets.length) return null;
+		const records = targets.map((target) => hooks.find((item) => item.target === target));
+		if (records.some((record) => !record)) return el("span", { class: "bcxfix-badge bad", text: "hook 未注册" });
+		const okCount = records.filter((record) => record.ok).length;
+		return okCount === records.length
+			? el("span", { class: "bcxfix-badge ok", text: `hook ${okCount}/${records.length}` })
+			: el("span", { class: "bcxfix-badge bad", text: `hook ${okCount}/${records.length}` });
+	}
+
+	function fieldValue(field) {
+		const value = config[field.key];
+		if (field.type === "list") return (Array.isArray(value) ? value : []).join(", ");
+		if (field.type === "number") return Number.isFinite(Number(value)) ? String(value) : "";
+		return value == null ? "" : String(value);
+	}
+
+	function parseListInput(raw, numeric) {
+		const parts = String(raw || "")
+			.split(/[,，;；\s]+/)
+			.map((item) => item.trim())
+			.filter(Boolean);
+		const out = [];
+		parts.forEach((item) => {
+			const value = numeric ? Number(item) : item;
+			if (numeric && !Number.isFinite(value)) return;
+			if (!out.includes(value)) out.push(value);
+		});
+		return out;
+	}
+
+	/** 某个值改了之后需要立刻产生的副作用（其余都是 hook 里实时读 config，无需处理） */
+	function afterConfigChange(key) {
+		try {
+			if (key === "hideFriendsWhenBlind" || key === "friendsVisible") {
+				if (config.hideFriendsWhenBlind) maskFriendList();
+				else unmaskFriendList();
+			}
+			if (key === "uiFloatingButton") syncFloatingButton();
+		} catch (err) {
+			logErr("应用设置", err);
+		}
+	}
+
+	function buildField(field) {
+		const wrap = el("div", { class: field.type === "switch" ? "bcxfix-field inline" : "bcxfix-field" });
+		const label = el("span", { class: "bcxfix-label", text: `${field.zh} · ${field.en}` });
+
+		if (field.type === "switch") {
+			const box = el("input", { type: "checkbox" });
+			box.checked = !!config[field.key];
+			box.addEventListener("change", () => {
+				config[field.key] = box.checked;
+				saveConfig();
+				afterConfigChange(field.key);
+				refreshTabCounts();
+			});
+			wrap.append(box, label);
+			return wrap;
+		}
+
+		const input = el("input", {
+			class: "bcxfix-input",
+			type: field.type === "number" ? "number" : "text",
+			spellcheck: "false",
+			value: fieldValue(field),
+		});
+		input.addEventListener("change", () => {
+			try {
+				if (field.type === "list") config[field.key] = parseListInput(input.value, !!field.numeric);
+				else if (field.type === "number") {
+					const num = Number(input.value);
+					config[field.key] = Number.isFinite(num) ? num : 0;
+				} else config[field.key] = input.value;
+				input.value = fieldValue(field);
+				saveConfig();
+				afterConfigChange(field.key);
+			} catch (err) {
+				logErr("保存字段", err);
+			}
+		});
+
+		wrap.append(label, input);
+		if (field.hint) wrap.append(el("span", { class: "bcxfix-hint", text: field.hint }));
+		return wrap;
+	}
+
+	function buildCard(rule) {
+		const card = el("div", { class: ruleEnabled(rule) ? "bcxfix-card" : "bcxfix-card off" });
+
+		const toggle = el("input", { type: "checkbox" });
+		toggle.checked = ruleEnabled(rule);
+		toggle.addEventListener("change", () => {
+			config[rule.key] = toggle.checked;
+			saveConfig();
+			card.classList.toggle("off", !toggle.checked);
+			afterConfigChange(rule.key);
+			refreshTabCounts();
+		});
+
+		const head = el("label", { class: "bcxfix-card-head" }, [
+			toggle,
+			el("span", { class: "bcxfix-name", text: rule.zh }),
+			el("span", { class: "bcxfix-bcx", text: rule.bcx || "" }),
+		]);
+		card.append(head);
+
+		if (rule.desc) card.append(el("div", { class: "bcxfix-desc", text: rule.desc }));
+
+		const badge = hookBadge(rule);
+		if (badge) {
+			badge.style.marginLeft = "27px";
+			badge.style.marginTop = "6px";
+			badge.style.display = "inline-block";
+			card.append(badge);
+		}
+
+		if (rule.fields && rule.fields.length) {
+			const fields = el("div", { class: "bcxfix-fields" });
+			rule.fields.forEach((field) => fields.append(buildField(field)));
+			card.append(fields);
+		}
+		return card;
+	}
+
+	function renderTabs(tabsEl) {
+		tabsEl.replaceChildren();
+		const allCount = RULES.filter(ruleEnabled).length;
+		tabsEl.append(
+			el(
+				"button",
+				{
+					class: uiTab === "all" ? "bcxfix-tab active" : "bcxfix-tab",
+					"data-tab": "all",
+					onclick: () => switchTab("all"),
+				},
+				[
+					document.createTextNode("全部"),
+					el("span", { class: "num", text: `${allCount}/${RULES.length}` }),
+				]
+			)
+		);
+		RULE_GROUPS.forEach((group) => {
+			const counts = groupCounts(group.id);
+			if (!counts.total) return;
+			tabsEl.append(
+				el(
+					"button",
+					{
+						class: uiTab === group.id ? "bcxfix-tab active" : "bcxfix-tab",
+						"data-tab": group.id,
+						onclick: () => switchTab(group.id),
+					},
+					[
+						document.createTextNode(group.zh),
+						el("span", { class: "num", text: `${counts.on}/${counts.total}` }),
+					]
+				)
+			);
+		});
+	}
+
+	function renderList(listEl) {
+		listEl.replaceChildren();
+		const groups = uiTab === "all" ? RULE_GROUPS : RULE_GROUPS.filter((group) => group.id === uiTab);
+		groups.forEach((group) => {
+			const rules = RULES.filter((rule) => rule.group === group.id);
+			if (!rules.length) return;
+			if (uiTab === "all")
+				listEl.append(el("div", { class: "bcxfix-group", text: `${group.zh} · ${group.en}` }));
+			rules.forEach((rule) => listEl.append(buildCard(rule)));
+		});
+	}
+
+	function switchTab(tabId) {
+		uiTab = tabId;
+		if (!uiRoot) return;
+		const tabsEl = uiRoot.querySelector(".bcxfix-tabs");
+		const listEl = uiRoot.querySelector(".bcxfix-body");
+		if (tabsEl) renderTabs(tabsEl);
+		if (listEl) {
+			renderList(listEl);
+			listEl.scrollTop = 0;
+		}
+	}
+
+	/** 勾选之后只刷新标签上的计数，不整页重绘（否则正在输入的框会失焦） */
+	function refreshTabCounts() {
+		if (!uiRoot) return;
+		const tabsEl = uiRoot.querySelector(".bcxfix-tabs");
+		if (tabsEl) renderTabs(tabsEl);
+		updateHookSummary();
+	}
+
+	function updateHookSummary() {
+		if (!uiRoot) return;
+		const target = uiRoot.querySelector(".bcxfix-hooksum");
+		if (!target) return;
+		const okCount = hooks.filter((item) => item.ok).length;
+		target.textContent = `hook ${okCount}/${hooks.length} 生效`;
+		target.className =
+			okCount === hooks.length ? "bcxfix-badge bcxfix-hooksum ok" : "bcxfix-badge bcxfix-hooksum bad";
+	}
+
+	function setAllRules(enabled) {
+		RULES.forEach((rule) => {
+			config[rule.key] = enabled;
+			(rule.fields || []).forEach((field) => {
+				if (field.type === "switch") config[field.key] = enabled;
+			});
+		});
+		saveConfig();
+		afterConfigChange("hideFriendsWhenBlind");
+		afterConfigChange("uiFloatingButton");
+		switchTab(uiTab);
+		notify(enabled ? "已开启全部规则" : "已关闭全部规则");
+	}
+
+	function resetRules() {
+		const fresh = Object.assign({}, DEFAULTS);
+		Object.keys(config).forEach((key) => delete config[key]);
+		Object.assign(config, fresh);
+		saveConfig();
+		afterConfigChange("hideFriendsWhenBlind");
+		afterConfigChange("uiFloatingButton");
+		switchTab(uiTab);
+		notify("已恢复默认设置");
+	}
+
+	function openSettings(mode) {
+		ensureUiStyle();
+		uiMode = mode === "embedded" ? "embedded" : "standalone";
+		if (uiRoot) {
+			// 已经开着，只切换模式
+			return uiRoot;
+		}
+		// 极早期（body 还没解析出来）时等一会儿再开
+		if (!document.body) {
+			if (!uiPendingOpen) {
+				uiPendingOpen = true;
+				const retry = () => {
+					uiPendingOpen = false;
+					openSettings(mode);
+				};
+				if (document.readyState === "loading")
+					document.addEventListener("DOMContentLoaded", retry, { once: true });
+				else setTimeout(retry, 100);
+			}
+			return null;
+		}
+
+		const panel = el("div", { class: "bcxfix-panel" });
+
+		panel.append(
+			el("div", { class: "bcxfix-head" }, [
+				el("img", { class: "bcxfix-logo", src: UI_ICON, alt: "BCX" }),
+				el("div", {}, [
+					el("div", { class: "bcxfix-title", text: "BCX 补充包" }),
+					el("div", {
+						class: "bcxfix-sub",
+						text: `BCX Supplement v${MOD_VERSION} · Bondage Club R133 · 勾选即生效`,
+					}),
+				]),
+				el("button", {
+					class: "bcxfix-close",
+					title: "关闭（Esc）",
+					text: "×",
+					onclick: () => closeSettings(),
+				}),
+			])
+		);
+
+		const tabs = el("div", { class: "bcxfix-tabs" });
+		renderTabs(tabs);
+		panel.append(tabs);
+
+		const body = el("div", { class: "bcxfix-body" });
+		renderList(body);
+		panel.append(body);
+
+		const hooksum = el("span", { class: "bcxfix-badge bcxfix-hooksum" });
+		panel.append(
+			el("div", { class: "bcxfix-foot" }, [
+				el("button", { class: "bcxfix-btn", text: "全部开启", onclick: () => setAllRules(true) }),
+				el("button", { class: "bcxfix-btn", text: "全部关闭", onclick: () => setAllRules(false) }),
+				el("button", { class: "bcxfix-btn", text: "恢复默认", onclick: () => resetRules() }),
+				el("span", { class: "bcxfix-credit" }, [
+					hooksum,
+					document.createTextNode("   设置会自动保存"),
+				]),
+			])
+		);
+
+		uiRoot = el("div", { id: UI_ROOT_ID }, [panel]);
+		uiRoot.addEventListener("mousedown", (event) => {
+			if (event.target === uiRoot) closeSettings();
+		});
+		document.body.append(uiRoot);
+
+		// hook 是「函数出现后再挂」的，面板打开后持续刷新状态
+		if (uiHookTimer) clearInterval(uiHookTimer);
+		uiHookTimer = setInterval(updateHookSummary, 1000);
+		updateHookSummary();
+
+		const onKeyDown = (event) => {
+			if (event.key === "Escape") {
+				event.preventDefault();
+				event.stopPropagation();
+				closeSettings();
+			}
+		};
+		document.addEventListener("keydown", onKeyDown, true);
+		uiRoot.__escHandler = onKeyDown;
+
+		return uiRoot;
+	}
+
+	/**
+	 * @param {boolean} [fromGame] true = 由 BC 自己收起（exit / unload），此时不要再回调
+	 *   PreferenceSubscreenExtensionsClear，否则会把自己又拉回扩展列表。
+	 */
+	function closeSettings(fromGame) {
+		if (!uiRoot) return;
+		const root = uiRoot;
+		uiRoot = null;
+		if (uiHookTimer) {
+			clearInterval(uiHookTimer);
+			uiHookTimer = null;
+		}
+		if (root.__escHandler) document.removeEventListener("keydown", root.__escHandler, true);
+		try {
+			root.remove();
+		} catch (err) {
+			/* 忽略 */
+		}
+
+		// 从偏好设置进来的，点 × 时回到「扩展」列表（BC 自己的返回流程）
+		if (uiMode === "embedded") {
+			uiMode = "standalone";
+			if (fromGame) return;
+			try {
+				if (typeof window.PreferenceSubscreenExtensionsClear === "function")
+					window.PreferenceSubscreenExtensionsClear();
+			} catch (err) {
+				logErr("返回扩展列表", err);
+			}
+		}
+	}
+
+	/** 屏幕右侧悬浮按钮 */
+	let fabRetries = 0;
+	function syncFloatingButton() {
+		const existing = document.getElementById(UI_FAB_ID);
+		if (!config.uiFloatingButton) {
+			if (existing) existing.remove();
+			return;
+		}
+		if (existing) return;
+		// 脚本是 document-start 注入的，那会儿 body 可能还没造出来
+		if (!document.body) {
+			if (fabRetries++ < 20) setTimeout(syncFloatingButton, 500);
+			return;
+		}
+		fabRetries = 0;
+		const button = el("button", {
+			id: UI_FAB_ID,
+			title: "BCX 补充包设置（也可在 偏好设置 → 扩展 里打开）",
+			text: "BCX",
+			onclick: (event) => {
+				event.preventDefault();
+				event.stopPropagation();
+				openSettings();
+			},
+		});
+		document.body.append(button);
+	}
+
+	/** 关掉「失明隐藏好友」时把列表还原（名字从 Player.FriendNames 取） */
+	function unmaskFriendList() {
+		document.querySelectorAll(".friend-list-row[data-bcx-masked]").forEach((row) => {
+			const nameCell = row.querySelector("td.MemberName, .MemberName");
+			const numberCell = row.querySelector("td.MemberNumber, .MemberNumber");
+			const number = Number(numberCell && numberCell.dataset.bcxMemberNumber);
+			let name = "";
+			try {
+				const map = player() && player().FriendNames;
+				if (map && typeof map.get === "function" && Number.isFinite(number)) name = map.get(number) || "";
+			} catch (err) {
+				/* 拿不到就退回缓存的名字 */
+			}
+			if (!name && nameCell && nameCell.dataset.bcxName) name = nameCell.dataset.bcxName;
+			if (nameCell) nameCell.textContent = name || (Number.isFinite(number) ? `#${number}` : "Someone");
+			if (numberCell) numberCell.textContent = Number.isFinite(number) ? String(number) : "######";
+			delete row.dataset.bcxMasked;
+		});
+	}
+
+	/**
+	 * 注册到「偏好设置 → 扩展」。这是 BC 官方给第三方扩展的入口，
+	 * BCX 原版也是这么挂的，所以位置和玩家习惯一致。
+	 * Scripts_Preference.js 可能比本脚本晚加载，所以带重试。
+	 */
+	let prefAttempt = 0;
+	function registerPreferenceEntry() {
+		if (uiPrefRegistered) return;
+		if (typeof window.PreferenceRegisterExtensionSetting !== "function") {
+			if (++prefAttempt <= 120) setTimeout(registerPreferenceEntry, 500);
+			return;
+		}
+		try {
+			window.PreferenceRegisterExtensionSetting({
+				Identifier: "BCXSupplement",
+				ButtonText: () => "BCX 补充包 / Supplement",
+				Image: UI_ICON,
+				load: () => openSettings("embedded"),
+				run: () => {},
+				click: () => {},
+				exit: () => {
+					closeSettings(true);
+					return true;
+				},
+				unload: () => closeSettings(true),
+			});
+			uiPrefRegistered = true;
+			console.log(`${TAG} ✓ 已注册到 偏好设置 → 扩展`);
+		} catch (err) {
+			console.warn(`${TAG} 注册偏好设置入口失败：`, err);
+		}
+	}
+
+	function installUi() {
+		ensureUiStyle();
+		syncFloatingButton();
+		registerPreferenceEntry();
 	}
 
 	// 所有函数与状态都已就绪，最后再启动（顺序不要调换，理由见 waitForSdk 上方注释）

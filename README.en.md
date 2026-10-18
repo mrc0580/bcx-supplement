@@ -6,7 +6,8 @@ Several rules in BCX (Bondage Club Extended) 1.1.22 hook functions that are no l
 
 - Main file: `bcx-supplement.user.js`
 - Compatibility: BC R128 and above (after the friend-list rework); every hook target verified on R133
-- Current version: **v1.2.3** (see [CHANGELOG.md](CHANGELOG.md))
+- Current version: **v2.0.0** (see [CHANGELOG.md](CHANGELOG.md))
+- **Since v2.0 there is an in-game settings panel**: one card per rule, each switchable on its own, with parameter editing and hook status. Entry points: Preferences → Extensions, the floating button on the right edge, or `/bcxfix ui` in chat
 
 ## Install (one click)
 
@@ -98,11 +99,34 @@ Paste the whole file into the console and press Enter — equivalent to Option A
 
 ## 3. Configuration
 
-Configuration lives in `localStorage["bcx-supplement.config.v1"]`. Two ways to change it:
+Configuration lives in `localStorage["bcx-supplement.config.v1"]`. Three ways to change it — the panel is the recommended one since v2.0.
+
+### Settings panel (new in v2.0, recommended)
+
+One card per rule; ticking a box applies immediately and saves automatically, so there is no key name to memorise.
+
+**Three entry points, all opening the same panel:**
+
+| Entry point | How to get there |
+|---|---|
+| Preferences → Extensions | In game: Preferences → Extensions → "BCX 补充包 / Supplement" (same place BCX itself lives) |
+| Floating button | The `BCX` round button on the right edge of the screen (can be turned off under General → Show floating button) |
+| Chat | Type `/bcxfix ui` and send |
+
+**What the panel gives you:**
+
+- Category tabs across the top, each showing "enabled / total" (e.g. `Hearing 2/2`): All / Friends & Vision / Hearing / Relationships / Room admin / Emotes / General;
+- Each card: checkbox + rule name + the original BCX rule id on the right (`alt_hide_friends` and friends, so you can match it against BCX) + a one-line description + a `hook 2/2` status badge;
+- The rule's own parameters sit in the same card, no commands needed: whitelisted member numbers, understood-word list, announcement text, cooldown in ms, which equip groups count as the head slot;
+- Footer: `全部开启` (all on) / `全部关闭` (all off) / `恢复默认` (reset), plus `hook 6/6 生效` on the right;
+- Close with `Esc`, the `×`, or a click on the backdrop.
+
+The rule inventory is the `RULES` array (plus `RULE_GROUPS` for categories). The panel, the `/bcxfix` status output and the toggle list are all generated from it — adding a rule means adding one entry and the UI picks it up.
 
 ### Chat command `/bcxfix`
 
 ```
+/bcxfix ui                    open the settings panel (same as the floating button)
 /bcxfix                       show all switches and whitelists
 /bcxfix off forbidNewSub      turn one off (key names below)
 /bcxfix on forbidNewSub       turn it back on
@@ -118,6 +142,8 @@ Configuration lives in `localStorage["bcx-supplement.config.v1"]`. Two ways to c
 ### Console
 
 ```js
+BCXSupplement.openSettings();  // open the settings panel
+BCXSupplement.diag();          // emote-rule self-check (same as /bcxfix emote)
 BCXSupplement.config.partialHearingRandom = false;
 BCXSupplement.config.partialHearingWords = ["hello", "please"];
 BCXSupplement.save();      // without save() the change is lost on refresh
@@ -148,6 +174,7 @@ BCXSupplement.status();    // check whether every hook is in place
 | `emoteNoticeMessage` | `"$name" tries to send an emotion, but failed due to he/she's in a mask` | Announcement template |
 | `emoteNoticeCooldownMs` | `1500` | Announcement cooldown to prevent spam (blocking itself is not affected) |
 | `emoteKeepInputText` | `true` | Keep the original text in the input box after blocking, so you don't retype it |
+| `uiFloatingButton` | `true` | Show the BCX floating button on the right edge (turn it off and use Preferences → Extensions instead) |
 
 ---
 
@@ -163,6 +190,21 @@ BCXSupplement.status();    // check whether every hook is in place
 **Deferred hooking**: BC's scripts load synchronously in order, so when `bcModSdk` appears the functions in `Screens/*.js` may not be defined yet. The script hooks each target "once the function exists", retrying every 500 ms for up to 60 seconds, so nothing is missed because of load order.
 
 **Priority**: reading the ModSDK source, a higher `hookFunction` priority means an outer wrapper (runs first, post-code runs last). Filter-style hooks therefore use a high priority (10) so they see the final result.
+
+### How the settings panel plugs into the game (v2.0)
+
+The panel is plain DOM appended to `document.body` with a `z-index` above the game canvas. What matters is that the entry point uses BC's official third-party extension API:
+
+```js
+PreferenceRegisterExtensionSetting({ Identifier, ButtonText, Image, load, run, click, exit, unload });
+```
+
+- After registering, a button shows up under Preferences → Extensions. That is exactly where BCX itself lives, so players find it;
+- BC's `PreferenceSubscreenExtensionsRun` keeps calling `run()` and **stops drawing the character**, so the extension must draw its own UI. We append our DOM and leave `run` / `click` empty;
+- Closing with the panel's `×` must call `PreferenceSubscreenExtensionsClear()` to get back to the extension list, but when BC itself collapses the screen (`exit` / `unload`) calling it again would drag the user back into the list. That is why `closeSettings(fromGame)` takes a flag to tell the two cases apart;
+- The chat command `/bcxfix ui` and the floating button call `openSettings()` directly and skip that lifecycle entirely.
+
+The rule inventory is a single source of truth: `RULES` (each rule plus its `fields`) and `RULE_GROUPS` (categories). The panel, the `/bcxfix` status output, the accepted `on|off` keys and the all-on/all-off buttons are all generated from that table, so adding a rule means adding one entry.
 
 ### How the added rule "forbid emote messages while Head is occupied" works
 
@@ -230,8 +272,13 @@ The supplement uses **global switches** and has none of BCX's "who it applies to
 | Normal speech | In the same state type `hello` (no `*`) | Sent normally (this rule doesn't touch normal chat) |
 | Facial expression | In the same state change the face expression (via the expression panel) | **Unaffected**, works normally (this rule doesn't touch facial expression icons) |
 | Remove the head item | Take the Head slot item off and send `*waves` | Sent normally |
-| Status check | `/bcxfix` | Shows the 10 switches + whitelists + the current Head item + whether all hooks are active |
+| Status check | `/bcxfix` | Shows the 15 switches + whitelists + the current Head item + whether all hooks are active |
 | Emote rule self-check | `/bcxfix emote` | Shows the switch, monitored groups, hook state, the item in each group, the current verdict, and how many times it blocked |
+| Settings panel | Preferences → Extensions → "BCX 补充包 / Supplement" | Panel opens with 7 category tabs and 11 rule cards, footer shows `hook 6/6 生效` |
+| Floating button | Click the `BCX` round button on the right edge | Same panel; can be turned off under General → Show floating button |
+| Panel switch | Untick "Hearing whitelist" | The card dims, and it is still off after a page refresh (written to localStorage) |
+| All off / all on | Click `全部关闭` then `全部开启` at the bottom | Every card follows; the emote rule stops/restarts working |
+| Turning the blind rule off | While blind open the friend list, then untick "Hide online friends if blind" in the panel | Already masked rows immediately show their real name and number again |
 
 If `/bcxfix` reports inactive hooks, send me the `[BCX-Supplement]` console logs — it most likely means BC changed again.
 
@@ -276,8 +323,8 @@ git push
 
 Since v1.2.2 there is a built-in self-check. Go through it in this order (the commands go into the **in-game chat box**, not the browser console — a leading `/` is parsed as a regex there and throws `Invalid regular expression`; in the console use `BCXSupplement.diag()` instead):
 
-1. **Confirm the script version**: the Tampermonkey dashboard must show `1.2.2`. Version 1.1.x blocked the facial-expression icon rather than `*text`; 1.2.0/1.2.1 had the two bugs listed below. Click "Check for userscript updates" once, or reinstall from the install page.
-2. **Confirm all 6 hooks are green**: search the console for `[BCX-Supplement]`; the last line should read `已加载 v1.2.2：6/6 个 hook 生效`.
+1. **Confirm the script version**: the Tampermonkey dashboard must show `2.0.0` or newer. Version 1.1.x blocked the facial-expression icon rather than `*text`; 1.2.0/1.2.1 had the two bugs listed below. Click "Check for userscript updates" once, or reinstall from the install page.
+2. **Confirm all 6 hooks are green**: search the console for `[BCX-Supplement]`; the last line should read `已加载 v2.0.0：6/6 个 hook 生效`.
 3. **Type `/bcxfix emote` in chat** and check each line:
    - `开关 …：关` → run `/bcxfix on forbidEmoteWhileHeadOccupied`
    - `ChatRoomSendEmote hook：未挂载` → BC changed again; send me the console log
