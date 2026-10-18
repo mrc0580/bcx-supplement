@@ -6,7 +6,7 @@ BCX（Bondage Club Extended）1.1.22 里有几条规则挂的 hook 在 BC R133 �
 
 - 主文件：`bcx-supplement.user.js`
 - 适用：BC R128 及以上（好友列表改版之后），在 R133 上核对过全部 hook 目标
-- 当前版本：**v1.2.2**（变更记录见 [CHANGELOG.md](CHANGELOG.md)）
+- 当前版本：**v1.2.3**（变更记录见 [CHANGELOG.md](CHANGELOG.md)）
 
 ## 安装（一键）
 
@@ -108,7 +108,7 @@ FUSAM 支持用 URL 参数加载本地脚本（见官方文档「Developing an A
 /bcxfix word hello            加/删「永远听得懂」的词
 /bcxfix notice <文本>         改「表情消息被拦截」的公告文本（{name} 或 $name 会被替换成昵称）
 /bcxfix emote                 表情消息规则自检（排查「不生效」先看这个）
-/bcxfix group ItemHood        把某个装备分组也算作「头部栏」（默认只有 ItemHead）
+/bcxfix group ItemHood        把某个装备分组加入/移出「头部栏」（默认 ItemHead + ItemHood）
 /bcxfix reset                 恢复默认
 ```
 
@@ -140,7 +140,7 @@ BCXSupplement.status();    // 看 hook 是否都挂上了
 | `forbidBreakLover` | `true` | 禁止与恋人分手 |
 | `limitAdminWhileRestrained` | `true` | 被束缚时禁掉除踢人/封禁外的房间管理动作 |
 | `forbidEmoteWhileHeadOccupied` | `true` | 头部栏（`ItemHead`）有物品时禁止发送表情消息（`*` 开头的 Emote 消息），并向房间公告 |
-| `emoteBlockGroups` | `["ItemHead"]` | 哪些装备分组算「头部栏」。默认只有衣柜的 Head 栏；头套在 `ItemHood` 等分组时用 `/bcxfix group` 加进来 |
+| `emoteBlockGroups` | `["ItemHead","ItemHood"]` | 哪些装备分组算「头部栏」。默认同时算 Head 栏和头套（很多面具/头罩其实是 `ItemHood`）；其它分组用 `/bcxfix group` 加 |
 | `emoteBlockAtProtocol` | `false` | 协议层兜底：有的聊天增强 mod 绕过 `ChatRoomSendEmote` 直接发消息，打开后在 `ServerSend` 再堵一道 |
 | `emoteNoticeMessage` | `"$name" tries to send an emotion, but failed due to he/she's in a mask` | 公告文本模板 |
 | `emoteNoticeCooldownMs` | `1500` | 公告冷却，防止连发刷屏（拦截本身不受冷却影响） |
@@ -271,14 +271,14 @@ git push
 
 ## 八、规则不生效怎么查（以「头部有物品禁用表情消息」为例）
 
-v1.2.2 起内置了自检命令，按这个顺序看：
+v1.2.2 起内置了自检命令，按这个顺序看（命令要敲在**游戏里的聊天输入框**，不是浏览器控制台——控制台里 `/` 会被当成正则开头，报 `Invalid regular expression`；控制台请用 `BCXSupplement.diag()`）：
 
 1. **确认脚本版本**：篡改猴面板里必须是 `1.2.2`。1.1.x 拦的是脸上的表情图标，不是 `*文字`；1.2.0/1.2.1 有下面表里的两个坑。手动点一次「检查用户脚本更新」，或重开安装页装一次。
 2. **确认 6 个 hook 全绿**：控制台搜 `[BCX-Supplement]`，最后一行应为 `已加载 v1.2.2：6/6 个 hook 生效`。
 3. **聊天框敲 `/bcxfix emote`**，逐项对照：
    - `开关 …：关` → `/bcxfix on forbidEmoteWhileHeadOccupied`
    - `ChatRoomSendEmote hook：未挂载` → BC 又改版了，把控制台日志发出来
-   - `ItemHead：InventoryGet=空，扫描=空` → 戴的东西不在 Head 栏，用 `/bcxfix group ItemHood` 之类加进来
+   - `ItemHead：InventoryGet=空，扫描=空` 且 `ItemHood` 也是空 → 戴的东西不在默认分组，看下一行「身上头部相关分组」，把那个分组用 `/bcxfix group <分组>` 加进来
    - `当前判定：不会拦截` → 就是上面某一条没满足
 4. **戴着头饰发一条 `*waves`，再看 `/bcxfix emote` 的「已拦截 N 次」**：
    - N 变成 1 → 规则在工作。若还是看到消息发出去了，说明有别的东西在替你发（宏、换行发送、别的 mod）

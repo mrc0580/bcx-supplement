@@ -6,7 +6,7 @@ Several rules in BCX (Bondage Club Extended) 1.1.22 hook functions that are no l
 
 - Main file: `bcx-supplement.user.js`
 - Compatibility: BC R128 and above (after the friend-list rework); every hook target verified on R133
-- Current version: **v1.2.2** (see [CHANGELOG.md](CHANGELOG.md))
+- Current version: **v1.2.3** (see [CHANGELOG.md](CHANGELOG.md))
 
 ## Install (one click)
 
@@ -111,7 +111,7 @@ Configuration lives in `localStorage["bcx-supplement.config.v1"]`. Two ways to c
 /bcxfix word hello            add/remove a word that is always understood
 /bcxfix notice <text>         change the "emote blocked" announcement ({name} or $name is replaced by the nickname)
 /bcxfix emote                 self-check for the emote rule (start here when it "doesn't work")
-/bcxfix group ItemHood        also treat a group as the Head slot (default is ItemHead only)
+/bcxfix group ItemHood        add/remove a group from the Head slot set (default: ItemHead + ItemHood)
 /bcxfix reset                 restore defaults
 ```
 
@@ -143,7 +143,7 @@ BCXSupplement.status();    // check whether every hook is in place
 | `forbidBreakLover` | `true` | Forbid breaking up with a lover |
 | `limitAdminWhileRestrained` | `true` | While restrained, disable room admin actions other than kick/ban |
 | `forbidEmoteWhileHeadOccupied` | `true` | Forbid emote messages (`*`-prefixed Emote messages) while the Head slot (`ItemHead`) is occupied, and announce it to the room |
-| `emoteBlockGroups` | `["ItemHead"]` | Which equip groups count as the "Head slot". Default is the wardrobe Head slot only; add `ItemHood` etc. via `/bcxfix group` if your hood lives elsewhere |
+| `emoteBlockGroups` | `["ItemHead","ItemHood"]` | Which equip groups count as the "Head slot". The Head slot and hoods both count by default (many masks are actually `ItemHood`); add others via `/bcxfix group` |
 | `emoteBlockAtProtocol` | `false` | Protocol-level backstop: some chat-enhancement mods bypass `ChatRoomSendEmote` and send messages directly; turn this on to also block in `ServerSend` |
 | `emoteNoticeMessage` | `"$name" tries to send an emotion, but failed due to he/she's in a mask` | Announcement template |
 | `emoteNoticeCooldownMs` | `1500` | Announcement cooldown to prevent spam (blocking itself is not affected) |
@@ -274,14 +274,14 @@ git push
 
 ## 8. Troubleshooting a rule that "doesn't work" (using the emote rule as the example)
 
-Since v1.2.2 there is a built-in self-check. Go through it in this order:
+Since v1.2.2 there is a built-in self-check. Go through it in this order (the commands go into the **in-game chat box**, not the browser console — a leading `/` is parsed as a regex there and throws `Invalid regular expression`; in the console use `BCXSupplement.diag()` instead):
 
 1. **Confirm the script version**: the Tampermonkey dashboard must show `1.2.2`. Version 1.1.x blocked the facial-expression icon rather than `*text`; 1.2.0/1.2.1 had the two bugs listed below. Click "Check for userscript updates" once, or reinstall from the install page.
 2. **Confirm all 6 hooks are green**: search the console for `[BCX-Supplement]`; the last line should read `已加载 v1.2.2：6/6 个 hook 生效`.
 3. **Type `/bcxfix emote` in chat** and check each line:
    - `开关 …：关` → run `/bcxfix on forbidEmoteWhileHeadOccupied`
    - `ChatRoomSendEmote hook：未挂载` → BC changed again; send me the console log
-   - `ItemHead：InventoryGet=空，扫描=空` → whatever you are wearing is not in the Head slot; add it with `/bcxfix group ItemHood` and friends
+   - `ItemHead：InventoryGet=空，扫描=空` and `ItemHood` is empty too → what you wear is in neither default group; look at the "head-related groups" line below and add that group with `/bcxfix group <group>`
    - `当前判定：不会拦截` → one of the lines above is not satisfied
 4. **Wear the head item, send `*waves`, then look at `已拦截 N 次` in `/bcxfix emote` again**:
    - N becomes 1 → the rule works. If the message still went out, something else is sending it for you (macro, newline send, another mod)

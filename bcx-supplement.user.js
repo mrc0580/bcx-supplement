@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC · BCX 失效规则补充包 (R133)
 // @namespace    bcx-supplement.local
-// @version      1.2.2
+// @version      1.2.3
 // @description  补回 BCX (Bondage Club Extended) 在 BC R133 上已失效的规则：失明时隐藏在线好友、部分听力/听力白名单、关系控制、束缚时限制管理员权限；另附自定义规则「头部栏有物品时禁止发送表情消息」
 // @author       mrc0580
 // @match        https://www.bondageprojects.elementfx.com/*
@@ -38,7 +38,7 @@
 
 	const TAG = "[BCX-Supplement]";
 	const CFG_KEY = "bcx-supplement.config.v1";
-	const MOD_VERSION = "1.2.2";
+	const MOD_VERSION = "1.2.3";
 
 	/** 默认配置：全部开启，白名单为空 */
 	const DEFAULTS = {
@@ -67,9 +67,12 @@
 		// 5) 自定义新增规则：头部栏（ItemHead）有物品时禁止发送「表情消息」
 		//    注意是表情消息（聊天里 * 开头的 Emote 消息），不是脸上的表情图标
 		forbidEmoteWhileHeadOccupied: true,
-		// 哪些装备分组算「头部栏」。默认只有 ItemHead（衣柜里的 Head 栏）；
-		// 如果你的头套在别的分组（例如 ItemHood），可以用 /bcxfix group 加进来
-		emoteBlockGroups: ["ItemHead"],
+		// 哪些装备分组算「头部栏」。ItemHead 是衣柜的 Head 栏，ItemHood 是头套
+		// （很多面具/头罩其实是 hood，v1.2.3 起两者默认都算）；
+		// 其它分组可以用 /bcxfix group 加进来
+		emoteBlockGroups: ["ItemHead", "ItemHood"],
+		// 配置结构版本，用来做一次性迁移
+		configVersion: 2,
 		// {name} / $name 会被替换成昵称（没有昵称就用账号名）
 		emoteNoticeMessage: '"$name" tries to send an emotion, but failed due to he/she\'s in a mask',
 		emoteNoticeCooldownMs: 1500,
@@ -99,6 +102,17 @@
 					merged.forbidEmoteWhileHeadOccupied = parsed.forbidEmotionWhileHeadOccupied;
 				if ("emotionNoticeMessage" in parsed) merged.emoteNoticeMessage = parsed.emotionNoticeMessage;
 				if ("emotionNoticeCooldownMs" in parsed) merged.emoteNoticeCooldownMs = parsed.emotionNoticeCooldownMs;
+
+				// v1.2.3：默认监控分组从 ["ItemHead"] 扩到 ["ItemHead","ItemHood"]。
+				// 只在「还是旧默认值」时升级，用户自己改过的列表保持不动。
+				const storedGroups = parsed.emoteBlockGroups;
+				const isOldDefault =
+					!Array.isArray(storedGroups) ||
+					(storedGroups.length === 1 && String(storedGroups[0]) === "ItemHead");
+				if (isOldDefault && !(Number(parsed.configVersion) >= 2)) {
+					merged.emoteBlockGroups = DEFAULTS.emoteBlockGroups.slice();
+				}
+				merged.configVersion = DEFAULTS.configVersion;
 			}
 			return merged;
 		} catch (err) {
@@ -261,6 +275,12 @@
 			save: saveConfig,
 			status: () => ({ hooks: hooks.slice(), config: Object.assign({}, config) }),
 			notify,
+			// 控制台用：BCXSupplement.diag() 打印表情规则自检
+			diag: () => {
+				const lines = emoteDiagnostics();
+				console.log(lines.join("\n"));
+				return lines;
+			},
 		};
 
 		// 延迟汇总：hook 是「函数出现后再挂」的，立刻统计会全是 pending
@@ -855,8 +875,10 @@
 			lines.push("Player：尚未登录或界面未就绪");
 		} else {
 			const name = P.Nickname || P.Name || `#${P.MemberNumber}`;
-			const count = Array.isArray(P.Appearance) ? P.Appearance.length : "?";
-			lines.push(`Player：${name}，家族 ${P.AssetFamily}，外观 ${count} 件`);
+			const appearance = Array.isArray(P.Appearance) ? P.Appearance : [];
+			lines.push(`Player：${name}，家族 ${P.AssetFamily}，外观 ${appearance.length} 件`);
+
+			// 每个监控分组各自的结果
 			for (const group of emoteBlockGroups()) {
 				let viaApi = "—";
 				try {
@@ -865,11 +887,35 @@
 				} catch (err) {
 					viaApi = "报错";
 				}
-				const viaScan = (Array.isArray(P.Appearance) ? P.Appearance : []).some(
+				const viaScan = appearance.some(
 					(it) => it && it.Asset && it.Asset.Group && it.Asset.Group.Name === group
 				);
 				lines.push(`${group}：InventoryGet=${viaApi}，扫描=${viaScan ? "有物品" : "空"}`);
 			}
+
+			// 身上所有「看起来和头有关」的分组，直接告诉你该监控哪个
+			const worn = [];
+			appearance.forEach((it) => {
+				if (it && it.Asset && it.Asset.Group && it.Asset.Group.Name && !worn.includes(it.Asset.Group.Name)) {
+					worn.push(it.Asset.Group.Name);
+				}
+			});
+			const headish = worn.filter((g) => /head|hood|mask|blind|face/i.test(g));
+			if (headish.length) {
+				lines.push(
+					`身上头部相关分组：${headish
+						.map((g) => {
+							const item = appearance.find((a) => a.Asset && a.Asset.Group && a.Asset.Group.Name === g);
+							const assetName = item && item.Asset && item.Asset.Name ? item.Asset.Name : "有物品";
+							const monitored = emoteBlockGroups().includes(g);
+							return `${g}(${assetName}${monitored ? "·已监控" : "·未监控"})`;
+						})
+						.join(", ")}`
+				);
+			} else {
+				lines.push(`身上没有任何 head/hood 类分组，当前全部分组：${worn.join(",") || "无"}`);
+			}
+
 			lines.push(`当前判定：${emoteForbidden() ? "会拦截" : "不会拦截"}`);
 		}
 
@@ -944,7 +990,9 @@
 							out.push(`当前公告：${String(config.emoteNoticeMessage).replace(/\{name\}|\$name/g, displayName())}`);
 						}
 					} else if (cmd === "emote" || cmd === "诊断") {
-						out.push(...emoteDiagnostics());
+						const lines = emoteDiagnostics();
+						console.log(lines.join("\n"));
+						out.push(...lines);
 					} else if (cmd === "group") {
 						const group = (parts[1] || "").trim();
 						if (group) {

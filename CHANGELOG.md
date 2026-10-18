@@ -2,6 +2,14 @@
 
 版本号规则：`主.次.修订`。修改后必须提升 `@version`，否则篡改猴不会拉取更新。
 
+## v1.2.3
+
+- **默认监控分组加入 `ItemHood`**：`emoteBlockGroups` 默认值从 `["ItemHead"]` 改为 `["ItemHead","ItemHood"]`。BC 里很多「面具/头罩」其实挂在 Hood 栏（`ItemHood`），只认 `ItemHead` 会漏判，表现就是规则完全没反应。
+  - 配置迁移：只在「存的是旧的 `["ItemHead"]`」时自动升级；用户自己改过的列表不动（新增 `configVersion` 字段）。
+- `/bcxfix emote` 增加一行「身上头部相关分组」，列出当前穿着里所有 head/hood/mask/blind/face 类分组及物品名，并标注是否已监控——直接告诉你该 `/bcxfix group` 哪个。
+- 新增控制台入口 `BCXSupplement.diag()`：效果等同 `/bcxfix emote`，但可以直接在开发者控制台调用（`/bcxfix` 是游戏内聊天指令，敲进控制台会被当成正则，报 `Invalid regular expression`）。
+- `/bcxfix emote` 现在同时把结果打进控制台，方便复制。
+
 ## v1.2.2
 
 - **修复**：「头部有物品时禁止发送表情消息」在部分情况下完全没反应（不拦截、控制台也不报错），两处根因：
