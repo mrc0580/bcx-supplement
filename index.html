@@ -26,7 +26,10 @@
   }
   main { width: 100%; max-width: 720px; }
   h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: .5px; }
-  .sub { color: var(--muted); margin: 0 0 28px; font-size: 14px; }
+  .sub { color: var(--muted); margin: 0 0 8px; font-size: 14px; }
+  .lang { color: var(--muted); font-size: 12.5px; margin: 0 0 24px; }
+  .lang a { color: var(--muted); }
+  .lang a.on { color: var(--accent); }
   .badge {
     display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 999px;
     border: 1px solid var(--line); color: var(--ok); margin-left: 8px; vertical-align: 3px;
@@ -61,6 +64,7 @@
 <main>
   <h1>BCX 失效规则补充包<span class="badge">v1.2.1</span></h1>
   <p class="sub">Bondage Club R133 · 用 bcModSdk 补回 BCX 1.1.22 里已经失效的规则</p>
+  <p class="lang"><a class="on" href="./README.md">中文说明</a> · <a href="./README.en.md">English README</a></p>
 
   <a class="install" href="./bcx-supplement.user.js">安装 / 更新脚本</a>
   <p class="hint">需要先装 <a href="https://www.tampermonkey.net/">Tampermonkey</a> 或 <a href="https://violentmonkey.github.io/">Violentmonkey</a>。装好后会跟随本页自动更新。</p>
@@ -91,6 +95,7 @@
       <li>jsDelivr：<a href="https://fastly.jsdelivr.net/gh/mrc0580/bcx-supplement@main/bcx-supplement.user.js">fastly.jsdelivr.net</a>（分支引用约 12 小时缓存）</li>
       <li>仓库主页：<a href="https://github.com/mrc0580/bcx-supplement">github.com/mrc0580/bcx-supplement</a></li>
       <li>变更记录：<a href="./CHANGELOG.md">CHANGELOG.md</a></li>
+      <li>文档：<a href="./README.md">README.md</a>（中文）· <a href="./README.en.md">README.en.md</a>（English）</li>
     </ul>
   </div>
 

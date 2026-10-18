@@ -1,5 +1,7 @@
 # BCX 失效规则补充包（BC R133）
 
+[English](README.en.md) | **中文**
+
 BCX（Bondage Club Extended）1.1.22 里有几条规则挂的 hook 在 BC R133 上已经没有被调用，勾选后完全没有效果。这个补充包用 `bcModSdk` 重新实现了这些规则的核心行为，**不改 BCX 本体**，可以随时单独关掉。另外还带一条 BCX 没有的自定义规则：**头部栏有物品时禁止发送表情消息**（聊天里以 `*` 开头的那条 Emote 消息，不是脸上的表情图标）。
 
 - 主文件：`bcx-supplement.user.js`
@@ -75,7 +77,7 @@ BCX（Bondage Club Extended）1.1.22 里有几条规则挂的 hook 在 BC R133 �
 
 扩展面板 →「添加新脚本」→ 把 `bcx-supplement.user.js` 全文粘进去保存。这样装的脚本**不会**跟着仓库更新（除非你把 `@updateURL` 一起粘进去），改完记得换回方式 A。
 
-### 方式 B：FUSAM 本地开发模式
+### 方式 C：FUSAM 本地开发模式
 
 FUSAM 支持用 URL 参数加载本地脚本（见官方文档「Developing an Addon for FUSAM」）：
 
@@ -83,7 +85,7 @@ FUSAM 支持用 URL 参数加载本地脚本（见官方文档「Developing an A
 2. 打开 `https://www.bondageprojects.elementfx.com/R133/BondageClub/?fusam=http://localhost:8000/bcx-supplement.user.js&fusamType=eval`
 3. FUSAM 里会出现一条「Local Development」的 addon，开关它即可。
 
-### 方式 C：临时试一下（刷新失效）
+### 方式 D：临时试一下（刷新失效）
 
 控制台粘贴整个文件内容回车即可，和方式 A 等价，只是每次刷新要重来。
 
@@ -252,5 +254,10 @@ node -e "const fs=require('fs');const p='bcx-supplement.user.js';let s=fs.readFi
 git commit -am "chore: bump version"
 git push
 ```
+
+### 中英文 README 必须同步
+
+- `README.md` 是中文版，`README.en.md` 是英文版。**两份要一起改**：规则列表、配置键、行为说明、发版流程任一变动，都要在同一次提交里同步到两个文件。
+- `CHANGELOG.md` 只保留一份（中文为主），纯文档改动也记一行。
 
 `docs/BCX-rule-breakage-report.md` 是当初的排查报告，保留作为「为什么这么写」的依据，不参与运行。

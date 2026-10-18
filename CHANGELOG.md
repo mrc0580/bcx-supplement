@@ -7,6 +7,7 @@
 - 发布到 GitHub（`mrc0580/bcx-supplement`），启用 GitHub Pages 作为安装与更新源。
 - 保留原 `@namespace`（`bcx-supplement.local`），这样从 URL 安装时会**覆盖已有的旧脚本**，而不是变成两份。
 - 安装页：<https://mrc0580.github.io/bcx-supplement/>
+- 文档：新增英文版 `README.en.md`，与 `README.md` 并存并需同步更新；安装页加入中英文切换入口。（仅文档，未改脚本，`@version` 不变。）
 
 ## v1.2.0
 
