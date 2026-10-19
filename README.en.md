@@ -6,8 +6,9 @@ Several rules in BCX (Bondage Club Extended) 1.1.22 hook functions that are no l
 
 - Main file: `bcx-supplement.user.js`
 - Compatibility: BC R128 and above (after the friend-list rework); every hook target verified on R133
-- Current version: **v2.0.0** (see [CHANGELOG.md](CHANGELOG.md))
+- Current version: **v2.1.0** (see [CHANGELOG.md](CHANGELOG.md))
 - **Since v2.0 there is an in-game settings panel**: one card per rule, each switchable on its own, with parameter editing and hook status. Entry points: Preferences → Extensions, the floating button on the right edge, or `/bcxfix ui` in chat
+- **Since v2.1 the interface is bilingual**: the panel is English by default and the `🌐` button in the header toggles Chinese/English, remembered across sessions
 
 ## Install (one click)
 
@@ -104,13 +105,20 @@ Configuration lives in `localStorage["bcx-supplement.config.v1"]`. Three ways to
 ### Settings panel (new in v2.0, recommended)
 
 One card per rule; ticking a box applies immediately and saves automatically, so there is no key name to memorise.
-![BCX Supplement settings panel](docs/ui-panel.png)
+
+![BCX Supplement settings panel](docs/ui-panel-en.png)
+
+**Interface language (v2.1):** the panel is **English by default**; the `🌐 中文` button in the header switches to Chinese (the button then reads `🌐 EN`). The choice is stored as `uiLang`, so it survives reloads. You can also run `/bcxfix lang zh` or `/bcxfix lang en`. Rule names, descriptions, field hints, category tabs, footer buttons, the `/bcxfix` status output and the emote self-check all follow the selected language.
+
+中文界面长这样（[README.md](README.md) 用的就是这张图）：
+
+![BCX 补充包设置面板（中文）](docs/ui-panel-zh.png)
 
 **Three entry points, all opening the same panel:**
 
 | Entry point | How to get there |
 |---|---|
-| Preferences → Extensions | In game: Preferences → Extensions → "BCX 补充包 / Supplement" (same place BCX itself lives) |
+| Preferences → Extensions | In game: Preferences → Extensions → "BCX Supplement / 补充包" (same place BCX itself lives) |
 | Floating button | The `BCX` round button on the right edge of the screen (can be turned off under General → Show floating button) |
 | Chat | Type `/bcxfix ui` and send |
 
@@ -119,7 +127,7 @@ One card per rule; ticking a box applies immediately and saves automatically, so
 - Category tabs across the top, each showing "enabled / total" (e.g. `Hearing 2/2`): All / Friends & Vision / Hearing / Relationships / Room admin / Emotes / General;
 - Each card: checkbox + rule name + the original BCX rule id on the right (`alt_hide_friends` and friends, so you can match it against BCX) + a one-line description + a `hook 2/2` status badge;
 - The rule's own parameters sit in the same card, no commands needed: whitelisted member numbers, understood-word list, announcement text, cooldown in ms, which equip groups count as the head slot;
-- Footer: `全部开启` (all on) / `全部关闭` (all off) / `恢复默认` (reset), plus `hook 6/6 生效` on the right;
+- Footer: `Enable all` / `Disable all` / `Restore defaults`, plus `hook 6/6 active` on the right;
 - Close with `Esc`, the `×`, or a click on the backdrop.
 
 The rule inventory is the `RULES` array (plus `RULE_GROUPS` for categories). The panel, the `/bcxfix` status output and the toggle list are all generated from it — adding a rule means adding one entry and the UI picks it up.
@@ -137,7 +145,8 @@ The rule inventory is the `RULES` array (plus `RULE_GROUPS` for categories). The
 /bcxfix notice <text>         change the "emote blocked" announcement ({name} or $name is replaced by the nickname)
 /bcxfix emote                 self-check for the emote rule (start here when it "doesn't work")
 /bcxfix group ItemHood        add/remove a group from the Head slot set (default: ItemHead + ItemHood)
-/bcxfix reset                 restore defaults
+/bcxfix lang en|zh            switch the interface language (English by default); an open panel is rebuilt at once
+/bcxfix reset                 restore defaults (keeps the interface language)
 ```
 
 ### Console
@@ -176,6 +185,7 @@ BCXSupplement.status();    // check whether every hook is in place
 | `emoteNoticeCooldownMs` | `1500` | Announcement cooldown to prevent spam (blocking itself is not affected) |
 | `emoteKeepInputText` | `true` | Keep the original text in the input box after blocking, so you don't retype it |
 | `uiFloatingButton` | `true` | Show the BCX floating button on the right edge (turn it off and use Preferences → Extensions instead) |
+| `uiLang` | `"en"` | Interface language, `"en"` or `"zh"`. Change it with the `🌐` button in the panel header or `/bcxfix lang`; `/bcxfix reset` leaves it alone |
 
 ---
 
@@ -206,6 +216,18 @@ PreferenceRegisterExtensionSetting({ Identifier, ButtonText, Image, load, run, c
 - The chat command `/bcxfix ui` and the floating button call `openSettings()` directly and skip that lifecycle entirely.
 
 The rule inventory is a single source of truth: `RULES` (each rule plus its `fields`) and `RULE_GROUPS` (categories). The panel, the `/bcxfix` status output, the accepted `on|off` keys and the all-on/all-off buttons are all generated from that table, so adding a rule means adding one entry.
+
+### How the bilingual interface works (v2.1)
+
+There is no second copy of the UI and no string replacement — the same DOM reads its text in the current language:
+
+- **Rule names / descriptions / hints** are written in pairs inside `RULES`: `zh` / `en`, `desc` / `descEn`, `hint` / `hintEn` (the two "added by this supplement" rules also carry `bcxEn`). `nameOf(item)` and `pick(item, "desc")` select one side based on `lang()`, falling back to Chinese when an English string is missing.
+- **Panel chrome** (title, subtitle, close tooltip, the "All" tab, the three footer buttons, the `hook n/n` badge, the floating-button tooltip, the Preferences entry name) lives in `L10N.zh` / `L10N.en` and is read with `t("key")`; the one that takes arguments (`hookSum`) is stored as a function.
+- **Command output** uses an inline `L("中文", "English")` helper, so `/bcxfix` status and the `/bcxfix emote` self-check follow the language too.
+- **Switching does not reload the page**: `setLang()` writes `uiLang` and calls `rebuildSettings()`, which tears the panel down and rebuilds it in the new language while restoring the active category tab and scroll position — switching while on "Relationships" does not jump back to "All".
+- **`/bcxfix reset` does not touch `uiLang`**: language is an interface preference, not a rule, so resetting rules keeps it.
+
+When you add a rule or a field later, write `en` / `descEn` / `hintEn` alongside it and the English UI is complete automatically; anything missing falls back to Chinese rather than showing a blank.
 
 ### How the added rule "forbid emote messages while Head is occupied" works
 
@@ -275,6 +297,7 @@ The supplement uses **global switches** and has none of BCX's "who it applies to
 | Remove the head item | Take the Head slot item off and send `*waves` | Sent normally |
 | Status check | `/bcxfix` | Shows the 15 switches + whitelists + the current Head item + whether all hooks are active |
 | Emote rule self-check | `/bcxfix emote` | Shows the switch, monitored groups, hook state, the item in each group, the current verdict, and how many times it blocked |
+| Interface language | `🌐` in the panel header / `/bcxfix lang` | English ⇄ Chinese; the panel rebuilds at once and the choice is stored in `uiLang` |
 | Settings panel | Preferences → Extensions → "BCX 补充包 / Supplement" | Panel opens with 7 category tabs and 11 rule cards, footer shows `hook 6/6 生效` |
 | Floating button | Click the `BCX` round button on the right edge | Same panel; can be turned off under General → Show floating button |
 | Panel switch | Untick "Hearing whitelist" | The card dims, and it is still off after a page refresh (written to localStorage) |
@@ -324,8 +347,8 @@ git push
 
 Since v1.2.2 there is a built-in self-check. Go through it in this order (the commands go into the **in-game chat box**, not the browser console — a leading `/` is parsed as a regex there and throws `Invalid regular expression`; in the console use `BCXSupplement.diag()` instead):
 
-1. **Confirm the script version**: the Tampermonkey dashboard must show `2.0.0` or newer. Version 1.1.x blocked the facial-expression icon rather than `*text`; 1.2.0/1.2.1 had the two bugs listed below. Click "Check for userscript updates" once, or reinstall from the install page.
-2. **Confirm all 6 hooks are green**: search the console for `[BCX-Supplement]`; the last line should read `已加载 v2.0.0：6/6 个 hook 生效`.
+1. **Confirm the script version**: the Tampermonkey dashboard must show `2.0.0` or newer (`2.1.0`+ for the bilingual UI). Version 1.1.x blocked the facial-expression icon rather than `*text`; 1.2.0/1.2.1 had the two bugs listed below. Click "Check for userscript updates" once, or reinstall from the install page.
+2. **Confirm all 6 hooks are green**: search the console for `[BCX-Supplement]`; the last line should read `已加载 v2.1.0：6/6 个 hook 生效`.
 3. **Type `/bcxfix emote` in chat** and check each line:
    - `开关 …：关` → run `/bcxfix on forbidEmoteWhileHeadOccupied`
    - `ChatRoomSendEmote hook：未挂载` → BC changed again; send me the console log

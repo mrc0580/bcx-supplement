@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         BC · BCX 失效规则补充包 (R133)
 // @namespace    bcx-supplement.local
-// @version      2.0.0
-// @description  补回 BCX (Bondage Club Extended) 在 BC R133 上已失效的规则：失明时隐藏在线好友、部分听力/听力白名单、关系控制、束缚时限制管理员权限；另附自定义规则「头部栏有物品时禁止发送表情消息」。v2.0 提供可视化设置面板，每条规则可单独开关（偏好设置 → 扩展，或屏幕右侧悬浮按钮）
+// @version      2.1.0
+// @description  补回 BCX (Bondage Club Extended) 在 BC R133 上已失效的规则：失明时隐藏在线好友、部分听力/听力白名单、关系控制、束缚时限制管理员权限；另附自定义规则「头部栏有物品时禁止发送表情消息」。v2.0 起提供可视化设置面板，每条规则可单独开关；v2.1 起界面中英双语，默认英文，面板右上角可切换
 // @author       mrc0580
 // @match        https://www.bondageprojects.elementfx.com/*
 // @match        https://bondageprojects.elementfx.com/*
@@ -38,7 +38,7 @@
 
 	const TAG = "[BCX-Supplement]";
 	const CFG_KEY = "bcx-supplement.config.v1";
-	const MOD_VERSION = "2.0.0";
+	const MOD_VERSION = "2.1.0";
 
 	/** 默认配置：全部开启，白名单为空 */
 	const DEFAULTS = {
@@ -84,6 +84,9 @@
 
 		// 界面：屏幕右侧的悬浮按钮（点开设置面板）。可以关掉，改用偏好设置里的入口。
 		uiFloatingButton: true,
+
+		// 界面语言：zh / en。v2.1 起默认英文，面板右上角可随时切换。
+		uiLang: "en",
 	};
 
 	// ---------------------------------------------------------------------
@@ -114,6 +117,8 @@
 			en: "Hide online friends if blind",
 			bcx: "alt_hide_friends",
 			desc: "完全失明时把好友列表的昵称与编号遮成 Someone / ######，并去掉「发送蜂鸣」动作。",
+			descEn:
+				"While fully blind, masks friend nicknames and member numbers as Someone / ###### and removes the \"beep\" action.",
 			fields: [
 				{
 					key: "friendsVisible",
@@ -122,6 +127,7 @@
 					zh: "例外成员编号",
 					en: "Exceptions (member numbers)",
 					hint: "依然可见的成员，用逗号或空格分隔，例如 12345, 67890",
+					hintEn: "Members that stay visible, comma or space separated, e.g. 12345, 67890",
 				},
 			],
 		},
@@ -132,6 +138,8 @@
 			en: "Partial hearing",
 			bcx: "speech_partial_hearing",
 			desc: "失聪时不再全部听不懂：部分词仍能听清（默认每个词 25% 概率听懂，另有固定可懂词表）。",
+			descEn:
+				"Being deaf no longer means understanding nothing: some words still get through (25% chance per word by default, plus an always-understood word list).",
 			fields: [
 				{ key: "partialHearingRandom", type: "switch", zh: "随机听懂 25%", en: "Random 25% understood" },
 				{
@@ -140,6 +148,7 @@
 					zh: "永远听得懂的词",
 					en: "Always understood words",
 					hint: "用逗号分隔，例如 hello, please, stop",
+					hintEn: "Comma separated, e.g. hello, please, stop",
 				},
 			],
 		},
@@ -150,6 +159,7 @@
 			en: "Hearing whitelist",
 			bcx: "alt_hearing_whitelist",
 			desc: "白名单里的成员对你说话时，即使你失聪也能完全听懂。",
+			descEn: "Members on the whitelist are fully understood even while you are deaf.",
 			fields: [
 				{
 					key: "hearingWhitelistMembers",
@@ -158,6 +168,7 @@
 					zh: "白名单成员编号",
 					en: "Whitelisted member numbers",
 					hint: "用逗号分隔，例如 12345, 67890",
+					hintEn: "Comma separated, e.g. 12345, 67890",
 				},
 				{
 					key: "hearingWhitelistIgnoreGagged",
@@ -174,6 +185,8 @@
 			en: "Forbid club owner changes",
 			bcx: "rc_owner_change",
 			desc: "不接受新的主人，也不主动解除与现任主人的关系（试用期转正不受影响）。",
+			descEn:
+				"Refuses new owners and blocks leaving your current owner (trial-to-full promotion is unaffected).",
 		},
 		{
 			key: "forbidNewSub",
@@ -182,6 +195,8 @@
 			en: "Forbid taking new submissives",
 			bcx: "rc_take_sub",
 			desc: "不向别人发出收 sub 的请求（已成为你的试用 sub 的转正请求仍然允许）。",
+			descEn:
+				"Never sends a \"become my submissive\" request to anyone (promoting an existing trial submissive is still allowed).",
 		},
 		{
 			key: "forbidReleaseSub",
@@ -190,6 +205,7 @@
 			en: "Forbid disowning submissives",
 			bcx: "rc_release_sub",
 			desc: "不允许自己主动释放已有的 sub。",
+			descEn: "Blocks you from releasing your existing submissives.",
 		},
 		{
 			key: "forbidNewLover",
@@ -198,6 +214,8 @@
 			en: "Forbid getting new lovers",
 			bcx: "rc_new_lover",
 			desc: "不接受新的恋人关系（已与你互为恋人的求婚/升级仍然允许）。",
+			descEn:
+				"Refuses new lover relationships (proposals or upgrades with someone who is already your lover are still allowed).",
 		},
 		{
 			key: "forbidBreakLover",
@@ -206,6 +224,7 @@
 			en: "Forbid breaking up with lovers",
 			bcx: "rc_break_lover",
 			desc: "不允许主动与恋人解除关系。",
+			descEn: "Blocks you from breaking up with a lover.",
 		},
 		{
 			key: "limitAdminWhileRestrained",
@@ -214,6 +233,7 @@
 			en: "Limit bound admin power",
 			bcx: "alt_room_admin_limit",
 			desc: "被束缚时不能执行房间管理操作（踢人 / 封禁除外）。",
+			descEn: "Room admin actions are disabled while you are restrained (kick / ban are excluded).",
 		},
 		{
 			key: "forbidEmoteWhileHeadOccupied",
@@ -221,7 +241,10 @@
 			zh: "头部有物品时禁止发送表情消息",
 			en: "Forbid emote messages while the head slot is occupied",
 			bcx: "（本补充包新增，BCX 没有）",
+			bcxEn: "(added by this supplement, not in BCX)",
 			desc: "头上戴着面具/头套时，用 *文字、/me、:文字 等方式发出的表情消息会被拦下，并向房间公告。",
+			descEn:
+				"While a mask or hood covers your head, emote messages sent with *text, /me or :text are blocked and announced to the room.",
 			fields: [
 				{
 					key: "emoteBlockGroups",
@@ -229,6 +252,7 @@
 					zh: "算作「头部」的装备分组",
 					en: "Groups treated as the head slot",
 					hint: "默认 ItemHead（Head 栏）与 ItemHood（头套），用逗号分隔",
+					hintEn: "ItemHead (Head slot) and ItemHood (hoods) by default, comma separated",
 				},
 				{
 					key: "emoteNoticeMessage",
@@ -236,6 +260,7 @@
 					zh: "拦截公告",
 					en: "Blocked announcement",
 					hint: "$name 或 {name} 会替换成你的昵称；留空则不公告",
+					hintEn: "$name or {name} is replaced by your nickname; leave empty for no announcement",
 				},
 				{
 					key: "emoteNoticeCooldownMs",
@@ -243,6 +268,7 @@
 					zh: "公告冷却（毫秒）",
 					en: "Announcement cooldown (ms)",
 					hint: "避免连续发送时刷屏，0 表示不限制",
+					hintEn: "Prevents spam when sending repeatedly; 0 means no limit",
 				},
 				{
 					key: "emoteKeepInputText",
@@ -264,9 +290,90 @@
 			zh: "显示屏幕悬浮按钮",
 			en: "Show floating button",
 			bcx: "（本补充包新增）",
+			bcxEn: "(added by this supplement)",
 			desc: "屏幕右侧显示一个 BCX 按钮，点开这个设置面板。关掉后可以从「偏好设置 → 扩展」进入。",
+			descEn:
+				"Shows a BCX button on the right edge of the screen that opens this panel. When off, use Preferences → Extensions.",
 		},
 	];
+
+	// ---------------------------------------------------------------------
+	// 界面语言（v2.1）
+	//
+	// 规则名/说明用 RULES 里的 zh / en、desc / descEn、hint / hintEn；
+	// 面板外框这些固定文案放在 L10N。默认英文，面板右上角可切换。
+	// ---------------------------------------------------------------------
+
+	const L10N = {
+		zh: {
+			title: "BCX 补充包",
+			sub: "勾选即生效 · 设置自动保存",
+			close: "关闭（Esc）",
+			tabAll: "全部",
+			hookMissing: "hook 未注册",
+			hookSum: (ok, total) => `hook ${ok}/${total} 生效`,
+			enableAll: "全部开启",
+			disableAll: "全部关闭",
+			reset: "恢复默认",
+			autosave: "设置会自动保存",
+			notifyAllOn: "已开启全部规则",
+			notifyAllOff: "已关闭全部规则",
+			notifyReset: "已恢复默认设置",
+			langButton: "EN",
+			langTitle: "切换到英文界面 / Switch to English",
+			prefButton: "BCX 补充包 / Supplement",
+			fabTitle: "BCX 补充包设置（也可在 偏好设置 → 扩展 里打开）",
+		},
+		en: {
+			title: "BCX Supplement",
+			sub: "Tick to apply instantly · saved automatically",
+			close: "Close (Esc)",
+			tabAll: "All",
+			hookMissing: "hook missing",
+			hookSum: (ok, total) => `hook ${ok}/${total} active`,
+			enableAll: "Enable all",
+			disableAll: "Disable all",
+			reset: "Restore defaults",
+			autosave: "Settings are saved automatically",
+			notifyAllOn: "All rules enabled",
+			notifyAllOff: "All rules disabled",
+			notifyReset: "Settings restored to defaults",
+			langButton: "中文",
+			langTitle: "切换到中文界面 / Switch to Chinese",
+			prefButton: "BCX Supplement / 补充包",
+			fabTitle: "BCX Supplement settings (also under Preferences → Extensions)",
+		},
+	};
+
+	/** 当前界面语言：只认 zh，其余一律英文 */
+	function lang() {
+		return config && config.uiLang === "zh" ? "zh" : "en";
+	}
+
+	/** 取当前语言的界面文案；带参数的用 t("hookSum")(1, 2) */
+	function t(key) {
+		const table = L10N[lang()] || L10N.en;
+		const value = table[key] != null ? table[key] : L10N.en[key];
+		return value != null ? value : key;
+	}
+
+	/** 行内二选一：L("开", "on") */
+	function L(zh, en) {
+		return lang() === "zh" ? zh : en;
+	}
+
+	/** 规则 / 字段的显示名：中文取 zh，英文取 en（缺了退回中文） */
+	function nameOf(item) {
+		if (lang() === "zh") return item.zh || item.en || "";
+		return item.en || item.zh || "";
+	}
+
+	/** 规则 / 字段的说明与提示：英文看 base + "En" */
+	function pick(item, base) {
+		if (lang() === "zh") return item[base];
+		const alt = item[base + "En"];
+		return alt != null && alt !== "" ? alt : item[base];
+	}
 
 	// ---------------------------------------------------------------------
 	// 配置读写
@@ -335,7 +442,7 @@
 		console.info(`${TAG} ${msg}`);
 		try {
 			if (typeof window.ChatRoomSendLocal === "function" && window.ChatRoomData) {
-				window.ChatRoomSendLocal(`[BCX补充] ${msg}`, timeout);
+				window.ChatRoomSendLocal(`${L("[BCX补充]", "[BCX+]")} ${msg}`, timeout);
 			}
 		} catch (err) {
 			/* 忽略：不在聊天室或界面未就绪 */
@@ -1038,62 +1145,124 @@
 	const TOGGLES = allSwitchKeys();
 
 	function statusLines() {
-		const lines = [`BCX 补充包 v${MOD_VERSION}`];
+		const lines = [L(`BCX 补充包 v${MOD_VERSION}`, `BCX Supplement v${MOD_VERSION}`)];
 		for (const item of TOGGLES) {
-			lines.push(`${config[item.key] ? "开" : "关"}  ${item.zh}  (${item.key})`);
+			lines.push(`${config[item.key] ? L("开", "on ") : L("关", "off")}  ${nameOf(item)}  (${item.key})`);
 		}
-		lines.push(`可见好友：${(config.friendsVisible || []).join(",") || "无"}`);
-		lines.push(`听力白名单：${(config.hearingWhitelistMembers || []).join(",") || "无"}`);
-		lines.push(`可懂词：${(config.partialHearingWords || []).join(",") || "无"}`);
+		lines.push(
+			L(
+				`可见好友：${(config.friendsVisible || []).join(",") || "无"}`,
+				`Visible friends: ${(config.friendsVisible || []).join(",") || "none"}`
+			)
+		);
+		lines.push(
+			L(
+				`听力白名单：${(config.hearingWhitelistMembers || []).join(",") || "无"}`,
+				`Hearing whitelist: ${(config.hearingWhitelistMembers || []).join(",") || "none"}`
+			)
+		);
+		lines.push(
+			L(
+				`可懂词：${(config.partialHearingWords || []).join(",") || "无"}`,
+				`Understood words: ${(config.partialHearingWords || []).join(",") || "none"}`
+			)
+		);
 		const head = headItem();
 		const headName = head && head.Asset ? head.Asset.Name || head.Asset.Group.Name : "";
-		lines.push(`头部栏：${head ? headName || "有物品" : "空"}${emoteForbidden() ? "（表情消息已禁止）" : ""}`);
+		lines.push(
+			L(
+				`头部栏：${head ? headName || "有物品" : "空"}${emoteForbidden() ? "（表情消息已禁止）" : ""}`,
+				`Head slot: ${head ? headName || "occupied" : "empty"}${emoteForbidden() ? " (emotes blocked)" : ""}`
+			)
+		);
 		const failed = hooks.filter((h) => !h.ok);
-		lines.push(failed.length ? `未生效 hook：${failed.map((h) => h.target).join(",")}` : "所有 hook 均已生效");
+		lines.push(
+			failed.length
+				? L(
+						`未生效 hook：${failed.map((h) => h.target).join(",")}`,
+						`Hooks not active: ${failed.map((h) => h.target).join(",")}`
+					)
+				: L("所有 hook 均已生效", "All hooks are active")
+		);
 		return lines;
 	}
 
 	/** 「表情消息」规则的详细自检：规则看起来没反应时，聊天框敲 /bcxfix emote */
 	function emoteDiagnostics() {
-		const lines = [`BCX 补充包 v${MOD_VERSION} · 表情消息规则自检`];
+		const lines = [
+			L(
+				`BCX 补充包 v${MOD_VERSION} · 表情消息规则自检`,
+				`BCX Supplement v${MOD_VERSION} · emote rule self-check`
+			),
+		];
 
 		lines.push(
-			`开关 forbidEmoteWhileHeadOccupied：${config.forbidEmoteWhileHeadOccupied ? "开" : "关（关着就不会拦）"}`
+			L(
+				`开关 forbidEmoteWhileHeadOccupied：${config.forbidEmoteWhileHeadOccupied ? "开" : "关（关着就不会拦）"}`,
+				`forbidEmoteWhileHeadOccupied: ${
+					config.forbidEmoteWhileHeadOccupied ? "on" : "off (nothing is blocked while off)"
+				}`
+			)
 		);
-		lines.push(`监控分组：${emoteBlockGroups().join(",")}`);
+		lines.push(L(`监控分组：${emoteBlockGroups().join(",")}`, `Monitored groups: ${emoteBlockGroups().join(",")}`));
 
 		const rec = hooks.find((h) => h.target === "ChatRoomSendEmote");
 		lines.push(
-			`ChatRoomSendEmote hook：${
-				rec ? (rec.ok ? "已挂载" : `未挂载（${rec.error || "等待目标函数"}）`) : "未注册"
-			}`
+			L(
+				`ChatRoomSendEmote hook：${
+					rec ? (rec.ok ? "已挂载" : `未挂载（${rec.error || "等待目标函数"}）`) : "未注册"
+				}`,
+				`ChatRoomSendEmote hook: ${
+					rec ? (rec.ok ? "attached" : `not attached (${rec.error || "waiting for the function"})`) : "not registered"
+				}`
+			)
 		);
 		lines.push(
-			`游戏里该函数：${typeof window.ChatRoomSendEmote === "function" ? "存在" : "不存在（版本可能已改）"}`
+			L(
+				`游戏里该函数：${typeof window.ChatRoomSendEmote === "function" ? "存在" : "不存在（版本可能已改）"}`,
+				`Function in game: ${
+					typeof window.ChatRoomSendEmote === "function" ? "present" : "missing (the version may have changed)"
+				}`
+			)
 		);
-		lines.push(`协议层兜底 emoteBlockAtProtocol：${config.emoteBlockAtProtocol ? "开" : "关"}`);
+		lines.push(
+			L(
+				`协议层兜底 emoteBlockAtProtocol：${config.emoteBlockAtProtocol ? "开" : "关"}`,
+				`Protocol backstop emoteBlockAtProtocol: ${config.emoteBlockAtProtocol ? "on" : "off"}`
+			)
+		);
 
 		const P = player();
 		if (!P) {
-			lines.push("Player：尚未登录或界面未就绪");
+			lines.push(L("Player：尚未登录或界面未就绪", "Player: not logged in yet, or the UI is not ready"));
 		} else {
 			const name = P.Nickname || P.Name || `#${P.MemberNumber}`;
 			const appearance = Array.isArray(P.Appearance) ? P.Appearance : [];
-			lines.push(`Player：${name}，家族 ${P.AssetFamily}，外观 ${appearance.length} 件`);
+			lines.push(
+				L(
+					`Player：${name}，家族 ${P.AssetFamily}，外观 ${appearance.length} 件`,
+					`Player: ${name}, family ${P.AssetFamily}, ${appearance.length} appearance items`
+				)
+			);
 
 			// 每个监控分组各自的结果
 			for (const group of emoteBlockGroups()) {
 				let viaApi = "—";
 				try {
 					const item = typeof window.InventoryGet === "function" ? window.InventoryGet(P, group) : null;
-					viaApi = item && item.Asset ? item.Asset.Name || "有物品" : "空";
+					viaApi = item && item.Asset ? item.Asset.Name || L("有物品", "occupied") : L("空", "empty");
 				} catch (err) {
-					viaApi = "报错";
+					viaApi = L("报错", "error");
 				}
 				const viaScan = appearance.some(
 					(it) => it && it.Asset && it.Asset.Group && it.Asset.Group.Name === group
 				);
-				lines.push(`${group}：InventoryGet=${viaApi}，扫描=${viaScan ? "有物品" : "空"}`);
+				lines.push(
+					L(
+						`${group}：InventoryGet=${viaApi}，扫描=${viaScan ? "有物品" : "空"}`,
+						`${group}: InventoryGet=${viaApi}, scan=${viaScan ? "occupied" : "empty"}`
+					)
+				);
 			}
 
 			// 身上所有「看起来和头有关」的分组，直接告诉你该监控哪个
@@ -1105,30 +1274,47 @@
 			});
 			const headish = worn.filter((g) => /head|hood|mask|blind|face/i.test(g));
 			if (headish.length) {
-				lines.push(
-					`身上头部相关分组：${headish
-						.map((g) => {
-							const item = appearance.find((a) => a.Asset && a.Asset.Group && a.Asset.Group.Name === g);
-							const assetName = item && item.Asset && item.Asset.Name ? item.Asset.Name : "有物品";
-							const monitored = emoteBlockGroups().includes(g);
-							return `${g}(${assetName}${monitored ? "·已监控" : "·未监控"})`;
-						})
-						.join(", ")}`
-				);
+				const parts = headish
+					.map((g) => {
+						const item = appearance.find((a) => a.Asset && a.Asset.Group && a.Asset.Group.Name === g);
+						const assetName = item && item.Asset && item.Asset.Name ? item.Asset.Name : L("有物品", "occupied");
+						const monitored = emoteBlockGroups().includes(g);
+						return `${g}(${assetName}${monitored ? L("·已监控", " · monitored") : L("·未监控", " · not monitored")})`;
+					})
+					.join(", ");
+				lines.push(L(`身上头部相关分组：${parts}`, `Head-related groups worn: ${parts}`));
 			} else {
-				lines.push(`身上没有任何 head/hood 类分组，当前全部分组：${worn.join(",") || "无"}`);
+				lines.push(
+					L(
+						`身上没有任何 head/hood 类分组，当前全部分组：${worn.join(",") || "无"}`,
+						`No head/hood-like groups worn. All current groups: ${worn.join(",") || "none"}`
+					)
+				);
 			}
 
-			lines.push(`当前判定：${emoteForbidden() ? "会拦截" : "不会拦截"}`);
+			lines.push(
+				L(
+					`当前判定：${emoteForbidden() ? "会拦截" : "不会拦截"}`,
+					`Verdict: ${emoteForbidden() ? "will block" : "will not block"}`
+				)
+			);
 		}
 
 		lines.push(
-			`已拦截 ${emoteBlockCount} 次${
-				lastEmoteBlock ? `，最近 ${lastEmoteBlock.at}（${lastEmoteBlock.group}：${lastEmoteBlock.asset}）` : ""
-			}`
+			L(
+				`已拦截 ${emoteBlockCount} 次${
+					lastEmoteBlock ? `，最近 ${lastEmoteBlock.at}（${lastEmoteBlock.group}：${lastEmoteBlock.asset}）` : ""
+				}`,
+				`Blocked ${emoteBlockCount} time(s)${
+					lastEmoteBlock ? `, last at ${lastEmoteBlock.at} (${lastEmoteBlock.group}: ${lastEmoteBlock.asset})` : ""
+				}`
+			)
 		);
 		lines.push(
-			"若戴着头饰发 *文字 后这里仍是 0：说明消息没走 ChatRoomSendEmote（常见于别的聊天增强 mod 直接发协议）→ /bcxfix on emoteBlockAtProtocol 再试"
+			L(
+				"若戴着头饰发 *文字 后这里仍是 0：说明消息没走 ChatRoomSendEmote（常见于别的聊天增强 mod 直接发协议）→ /bcxfix on emoteBlockAtProtocol 再试",
+				"If this stays 0 after sending *text while wearing headgear, the message never went through ChatRoomSendEmote (usually another chat mod sending the protocol directly) → try /bcxfix on emoteBlockAtProtocol"
+			)
 		);
 		return lines;
 	}
@@ -1143,20 +1329,49 @@
 		try {
 			window.CommandCombine({
 				Tag: "bcxfix",
-				Description: "BCX 补充包：/bcxfix、/bcxfix on|off <键>、/bcxfix allowfriend <编号>",
+				Description: L(
+					"BCX 补充包：/bcxfix、/bcxfix on|off <键>、/bcxfix allowfriend <编号>",
+					"BCX Supplement: /bcxfix, /bcxfix on|off <key>, /bcxfix allowfriend <number>"
+				),
 				Action: (argString) => {
 					const parts = String(argString || "").trim().split(/\s+/).filter(Boolean);
 					const out = [];
 					const cmd = (parts[0] || "").toLowerCase();
 
-					if (cmd === "on" || cmd === "off") {
+					if (cmd === "lang" || cmd === "语言") {
+						const want = (parts[1] || "").toLowerCase();
+						if (want === "zh" || want === "en" || want === "cn") {
+							config.uiLang = want === "en" ? "en" : "zh";
+							saveConfig();
+							// 面板开着就立刻重建，方便马上看到效果
+							rebuildSettings();
+							out.push(
+								L(
+									`界面语言已切换为中文（/bcxfix lang en 切回英文）`,
+									`Interface language: English (/bcxfix lang zh to switch to Chinese)`
+								)
+							);
+						} else {
+							out.push(
+								L(
+									`当前界面语言：${lang() === "zh" ? "中文" : "英文"}（用法 /bcxfix lang en|zh）`,
+									`Current interface language: ${lang() === "zh" ? "Chinese" : "English"} (usage: /bcxfix lang en|zh)`
+								)
+							);
+						}
+					} else if (cmd === "on" || cmd === "off") {
 						const key = parts[1];
 						if (key && key in DEFAULTS) {
 							config[key] = cmd === "on";
 							saveConfig();
-							out.push(`${key} 已${cmd === "on" ? "开启" : "关闭"}（下次刷新也保留）`);
+							out.push(
+								L(
+									`${key} 已${cmd === "on" ? "开启" : "关闭"}（下次刷新也保留）`,
+									`${key} turned ${cmd === "on" ? "on" : "off"} (persists across refreshes)`
+								)
+							);
 						} else {
-							out.push(`未知键：${key || "(空)"}`);
+							out.push(L(`未知键：${key || "(空)"}`, `Unknown key: ${key || "(empty)"}`));
 						}
 					} else if (cmd === "allowfriend" || cmd === "allowhearing") {
 						const num = Number(parts[1]);
@@ -1167,9 +1382,14 @@
 							else list.add(num);
 							config[key] = Array.from(list);
 							saveConfig();
-							out.push(`${key}：${config[key].join(",") || "无"}`);
+							out.push(`${key}: ${config[key].join(",") || L("无", "none")}`);
 						} else {
-							out.push("请给出成员编号，例如 /bcxfix allowfriend 12345");
+							out.push(
+								L(
+									"请给出成员编号，例如 /bcxfix allowfriend 12345",
+									"A member number is required, e.g. /bcxfix allowfriend 12345"
+								)
+							);
 						}
 					} else if (cmd === "word") {
 						const word = (parts[1] || "").trim();
@@ -1179,18 +1399,38 @@
 							else list.add(word);
 							config.partialHearingWords = Array.from(list);
 							saveConfig();
-							out.push(`可懂词：${config.partialHearingWords.join(",") || "无"}`);
+							out.push(
+								`${L("可懂词", "Understood words")}: ${config.partialHearingWords.join(",") || L("无", "none")}`
+							);
 						} else {
-							out.push("请给出一个词，例如 /bcxfix word hello");
+							out.push(
+								L(
+									"请给出一个词，例如 /bcxfix word hello",
+									"A word is required, e.g. /bcxfix word hello"
+								)
+							);
 						}
 					} else if (cmd === "notice") {
 						const text = String(argString || "").trim().replace(/^notice\s*/i, "");
 						if (text) {
 							config.emoteNoticeMessage = text;
 							saveConfig();
-							out.push(`拦截公告已改为：${text.replace(/\{name\}|\$name/g, displayName())}`);
+							out.push(
+								L(
+									`拦截公告已改为：${text.replace(/\{name\}|\$name/g, displayName())}`,
+									`Blocked announcement set to: ${text.replace(/\{name\}|\$name/g, displayName())}`
+								)
+							);
 						} else {
-							out.push(`当前公告：${String(config.emoteNoticeMessage).replace(/\{name\}|\$name/g, displayName())}`);
+							out.push(
+								L(
+									`当前公告：${String(config.emoteNoticeMessage).replace(/\{name\}|\$name/g, displayName())}`,
+									`Current announcement: ${String(config.emoteNoticeMessage).replace(
+										/\{name\}|\$name/g,
+										displayName()
+									)}`
+								)
+							);
 						}
 					} else if (cmd === "emote" || cmd === "诊断") {
 						const lines = emoteDiagnostics();
@@ -1204,29 +1444,50 @@
 							else list.add(group);
 							config.emoteBlockGroups = Array.from(list);
 							saveConfig();
-							out.push(`监控分组：${config.emoteBlockGroups.join(",") || "无"}`);
+							out.push(
+								`${L("监控分组", "Monitored groups")}: ${
+									config.emoteBlockGroups.join(",") || L("无", "none")
+								}`
+							);
 						} else {
-							out.push(`监控分组：${emoteBlockGroups().join(",")}（用法 /bcxfix group ItemHood）`);
+							out.push(
+								L(
+									`监控分组：${emoteBlockGroups().join(",")}（用法 /bcxfix group ItemHood）`,
+									`Monitored groups: ${emoteBlockGroups().join(",")} (usage: /bcxfix group ItemHood)`
+								)
+							);
 						}
 					} else if (cmd === "ui" || cmd === "menu" || cmd === "设置" || cmd === "界面") {
 						openSettings();
-						out.push("设置面板已打开（Esc 或点右上角 × 关闭）");
+						out.push(
+							L(
+								"设置面板已打开（Esc 或点右上角 × 关闭）",
+								"Settings panel opened (press Esc or click × to close)"
+							)
+						);
 					} else if (cmd === "reset") {
+						const keepLang = config.uiLang;
 						const fresh = Object.assign({}, DEFAULTS);
 						Object.keys(config).forEach((key) => delete config[key]);
 						Object.assign(config, fresh);
+						// 语言是「界面偏好」不是规则，重置规则时不动它
+						config.uiLang = keepLang;
 						saveConfig();
 						afterConfigChange("hideFriendsWhenBlind");
 						afterConfigChange("uiFloatingButton");
-						out.push("配置已重置为默认值");
+						rebuildSettings();
+						out.push(L("配置已重置为默认值", "Settings restored to defaults"));
 					} else {
 						out.push(...statusLines());
 						out.push(
-							"用法：/bcxfix ui（打开设置面板）；/bcxfix on|off <键>；/bcxfix allowfriend|allowhearing <编号>；/bcxfix word <词>；/bcxfix notice <公告文本>；/bcxfix emote（表情规则自检）；/bcxfix group <分组>；/bcxfix reset"
+							L(
+								"用法：/bcxfix ui（打开设置面板）；/bcxfix on|off <键>；/bcxfix allowfriend|allowhearing <编号>；/bcxfix word <词>；/bcxfix notice <公告文本>；/bcxfix emote（表情规则自检）；/bcxfix group <分组>；/bcxfix lang en|zh；/bcxfix reset",
+								"Usage: /bcxfix ui (open panel); /bcxfix on|off <key>; /bcxfix allowfriend|allowhearing <number>; /bcxfix word <word>; /bcxfix notice <text>; /bcxfix emote (emote rule self-check); /bcxfix group <group>; /bcxfix lang en|zh; /bcxfix reset"
+							)
 						);
 					}
 
-					notify(out.join(" ｜ "), 20000);
+					notify(out.join(L(" ｜ ", " | ")), 20000);
 					return true;
 				},
 			});
@@ -1293,8 +1554,15 @@
 #${UI_ROOT_ID} .bcxfix-logo { width: 40px; height: 40px; image-rendering: pixelated; }
 #${UI_ROOT_ID} .bcxfix-title { font-size: 19px; font-weight: bold; letter-spacing: 0.5px; }
 #${UI_ROOT_ID} .bcxfix-sub { font-size: 12px; color: #9c9cb8; margin-top: 2px; }
+#${UI_ROOT_ID} .bcxfix-lang {
+	margin-left: auto; padding: 0 12px; height: 34px; border-radius: 6px; cursor: pointer;
+	background: #2f2f43; color: #d8d8ea; border: 1px solid #55557a; font-size: 13px; line-height: 1;
+	display: inline-flex; align-items: center; gap: 6px;
+}
+#${UI_ROOT_ID} .bcxfix-lang:hover { background: #3d3d58; border-color: #8b8bd0; color: #fff; }
+#${UI_ROOT_ID} .bcxfix-lang .flag { font-size: 14px; }
 #${UI_ROOT_ID} .bcxfix-close {
-	margin-left: auto; width: 34px; height: 34px; border-radius: 6px; cursor: pointer;
+	margin-left: 8px; width: 34px; height: 34px; border-radius: 6px; cursor: pointer;
 	background: #3a3a52; color: #d8d8ea; border: 1px solid #55557a; font-size: 20px; line-height: 1;
 }
 #${UI_ROOT_ID} .bcxfix-close:hover { background: #6b3a4c; border-color: #a05a72; color: #fff; }
@@ -1415,7 +1683,8 @@
 		const targets = RULE_HOOKS[rule.key] || [];
 		if (!targets.length) return null;
 		const records = targets.map((target) => hooks.find((item) => item.target === target));
-		if (records.some((record) => !record)) return el("span", { class: "bcxfix-badge bad", text: "hook 未注册" });
+		if (records.some((record) => !record))
+			return el("span", { class: "bcxfix-badge bad", text: t("hookMissing") });
 		const okCount = records.filter((record) => record.ok).length;
 		return okCount === records.length
 			? el("span", { class: "bcxfix-badge ok", text: `hook ${okCount}/${records.length}` })
@@ -1458,7 +1727,7 @@
 
 	function buildField(field) {
 		const wrap = el("div", { class: field.type === "switch" ? "bcxfix-field inline" : "bcxfix-field" });
-		const label = el("span", { class: "bcxfix-label", text: `${field.zh} · ${field.en}` });
+		const label = el("span", { class: "bcxfix-label", text: nameOf(field) });
 
 		if (field.type === "switch") {
 			const box = el("input", { type: "checkbox" });
@@ -1495,7 +1764,8 @@
 		});
 
 		wrap.append(label, input);
-		if (field.hint) wrap.append(el("span", { class: "bcxfix-hint", text: field.hint }));
+		const hint = pick(field, "hint");
+		if (hint) wrap.append(el("span", { class: "bcxfix-hint", text: hint }));
 		return wrap;
 	}
 
@@ -1514,12 +1784,13 @@
 
 		const head = el("label", { class: "bcxfix-card-head" }, [
 			toggle,
-			el("span", { class: "bcxfix-name", text: rule.zh }),
-			el("span", { class: "bcxfix-bcx", text: rule.bcx || "" }),
+			el("span", { class: "bcxfix-name", text: nameOf(rule) }),
+			el("span", { class: "bcxfix-bcx", text: pick(rule, "bcx") || "" }),
 		]);
 		card.append(head);
 
-		if (rule.desc) card.append(el("div", { class: "bcxfix-desc", text: rule.desc }));
+		const desc = pick(rule, "desc");
+		if (desc) card.append(el("div", { class: "bcxfix-desc", text: desc }));
 
 		const badge = hookBadge(rule);
 		if (badge) {
@@ -1549,7 +1820,7 @@
 					onclick: () => switchTab("all"),
 				},
 				[
-					document.createTextNode("全部"),
+					document.createTextNode(t("tabAll")),
 					el("span", { class: "num", text: `${allCount}/${RULES.length}` }),
 				]
 			)
@@ -1566,7 +1837,7 @@
 						onclick: () => switchTab(group.id),
 					},
 					[
-						document.createTextNode(group.zh),
+						document.createTextNode(nameOf(group)),
 						el("span", { class: "num", text: `${counts.on}/${counts.total}` }),
 					]
 				)
@@ -1581,7 +1852,12 @@
 			const rules = RULES.filter((rule) => rule.group === group.id);
 			if (!rules.length) return;
 			if (uiTab === "all")
-				listEl.append(el("div", { class: "bcxfix-group", text: `${group.zh} · ${group.en}` }));
+				listEl.append(
+					el("div", {
+						class: "bcxfix-group",
+						text: lang() === "zh" ? `${group.zh} · ${group.en}` : group.en,
+					})
+				);
 			rules.forEach((rule) => listEl.append(buildCard(rule)));
 		});
 	}
@@ -1611,7 +1887,7 @@
 		const target = uiRoot.querySelector(".bcxfix-hooksum");
 		if (!target) return;
 		const okCount = hooks.filter((item) => item.ok).length;
-		target.textContent = `hook ${okCount}/${hooks.length} 生效`;
+		target.textContent = t("hookSum")(okCount, hooks.length);
 		target.className =
 			okCount === hooks.length ? "bcxfix-badge bcxfix-hooksum ok" : "bcxfix-badge bcxfix-hooksum bad";
 	}
@@ -1627,7 +1903,7 @@
 		afterConfigChange("hideFriendsWhenBlind");
 		afterConfigChange("uiFloatingButton");
 		switchTab(uiTab);
-		notify(enabled ? "已开启全部规则" : "已关闭全部规则");
+		notify(enabled ? t("notifyAllOn") : t("notifyAllOff"));
 	}
 
 	function resetRules() {
@@ -1638,7 +1914,43 @@
 		afterConfigChange("hideFriendsWhenBlind");
 		afterConfigChange("uiFloatingButton");
 		switchTab(uiTab);
-		notify("已恢复默认设置");
+		notify(t("notifyReset"));
+	}
+
+	/** 切换界面语言：写配置后原地重建面板 */
+	function setLang(next) {
+		const target = next === "zh" ? "zh" : "en";
+		if (lang() === target) return;
+		config.uiLang = target;
+		saveConfig();
+		rebuildSettings();
+	}
+
+	/** 按当前语言把面板拆了重建，保留分类与滚动位置 */
+	function rebuildSettings() {
+		if (!uiRoot) return;
+
+		const mode = uiMode;
+		const bodyEl = uiRoot.querySelector(".bcxfix-body");
+		const scroll = bodyEl ? bodyEl.scrollTop : 0;
+		const root = uiRoot;
+
+		// 拆掉旧面板（不走 closeSettings：那会把偏好设置里的返回流程也触发一遍）
+		uiRoot = null;
+		if (uiHookTimer) {
+			clearInterval(uiHookTimer);
+			uiHookTimer = null;
+		}
+		if (root.__escHandler) document.removeEventListener("keydown", root.__escHandler, true);
+		try {
+			root.remove();
+		} catch (err) {
+			/* 忽略 */
+		}
+
+		const rebuilt = openSettings(mode);
+		const newBody = rebuilt && rebuilt.querySelector(".bcxfix-body");
+		if (newBody) newBody.scrollTop = scroll;
 	}
 
 	function openSettings(mode) {
@@ -1669,15 +1981,31 @@
 			el("div", { class: "bcxfix-head" }, [
 				el("img", { class: "bcxfix-logo", src: UI_ICON, alt: "BCX" }),
 				el("div", {}, [
-					el("div", { class: "bcxfix-title", text: "BCX 补充包" }),
+					el("div", { class: "bcxfix-title", text: t("title") }),
 					el("div", {
 						class: "bcxfix-sub",
-						text: `BCX Supplement v${MOD_VERSION} · Bondage Club R133 · 勾选即生效`,
+						text: `BCX Supplement v${MOD_VERSION} · Bondage Club R133 · ${t("sub")}`,
 					}),
 				]),
+				el(
+					"button",
+					{
+						class: "bcxfix-lang",
+						title: t("langTitle"),
+						onclick: (event) => {
+							event.preventDefault();
+							event.stopPropagation();
+							setLang(lang() === "zh" ? "en" : "zh");
+						},
+					},
+					[
+						el("span", { class: "flag", text: "🌐" }),
+						el("span", { text: t("langButton") }),
+					]
+				),
 				el("button", {
 					class: "bcxfix-close",
-					title: "关闭（Esc）",
+					title: t("close"),
 					text: "×",
 					onclick: () => closeSettings(),
 				}),
@@ -1695,12 +2023,12 @@
 		const hooksum = el("span", { class: "bcxfix-badge bcxfix-hooksum" });
 		panel.append(
 			el("div", { class: "bcxfix-foot" }, [
-				el("button", { class: "bcxfix-btn", text: "全部开启", onclick: () => setAllRules(true) }),
-				el("button", { class: "bcxfix-btn", text: "全部关闭", onclick: () => setAllRules(false) }),
-				el("button", { class: "bcxfix-btn", text: "恢复默认", onclick: () => resetRules() }),
+				el("button", { class: "bcxfix-btn", text: t("enableAll"), onclick: () => setAllRules(true) }),
+				el("button", { class: "bcxfix-btn", text: t("disableAll"), onclick: () => setAllRules(false) }),
+				el("button", { class: "bcxfix-btn", text: t("reset"), onclick: () => resetRules() }),
 				el("span", { class: "bcxfix-credit" }, [
 					hooksum,
-					document.createTextNode("   设置会自动保存"),
+					document.createTextNode(`   ${t("autosave")}`),
 				]),
 			])
 		);
@@ -1778,7 +2106,7 @@
 		fabRetries = 0;
 		const button = el("button", {
 			id: UI_FAB_ID,
-			title: "BCX 补充包设置（也可在 偏好设置 → 扩展 里打开）",
+			title: t("fabTitle"),
 			text: "BCX",
 			onclick: (event) => {
 				event.preventDefault();
@@ -1824,7 +2152,7 @@
 		try {
 			window.PreferenceRegisterExtensionSetting({
 				Identifier: "BCXSupplement",
-				ButtonText: () => "BCX 补充包 / Supplement",
+				ButtonText: () => t("prefButton"),
 				Image: UI_ICON,
 				load: () => openSettings("embedded"),
 				run: () => {},
